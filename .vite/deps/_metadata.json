@@ -1,0 +1,60 @@
+{
+  "hash": "e7ddfbbd",
+  "configHash": "1ce6df32",
+  "lockfileHash": "fddb498c",
+  "browserHash": "bd933209",
+  "optimized": {
+    "abcjs": {
+      "src": "../../node_modules/.pnpm/abcjs@6.7.2/node_modules/abcjs/index.js",
+      "file": "abcjs.js",
+      "fileHash": "8d9736f9",
+      "needsInterop": true
+    },
+    "react-dom/client": {
+      "src": "../../node_modules/.pnpm/react-dom@19.3.1_react@19.3.1/node_modules/react-dom/client.js",
+      "file": "react-dom_client.js",
+      "fileHash": "6264e218",
+      "needsInterop": true
+    },
+    "react": {
+      "src": "../../node_modules/.pnpm/react@19.3.1/node_modules/react/index.js",
+      "file": "react.js",
+      "fileHash": "bc388057",
+      "needsInterop": true
+    },
+    "react/jsx-dev-runtime": {
+      "src": "../../node_modules/.pnpm/react@19.3.1/node_modules/react/jsx-dev-runtime.js",
+      "file": "react_jsx-dev-runtime.js",
+      "fileHash": "5f6fd631",
+      "needsInterop": true
+    },
+    "tone": {
+      "src": "../../node_modules/.pnpm/tone@15.1.22/node_modules/tone/build/esm/index.js",
+      "file": "tone.js",
+      "fileHash": "254a906d",
+      "needsInterop": false
+    },
+    "zustand": {
+      "src": "../../node_modules/.pnpm/zustand@5.0.16_@types+react@19.3.0_react@19.3.1/node_modules/zustand/esm/index.mjs",
+      "file": "zustand.js",
+      "fileHash": "7ae600eb",
+      "needsInterop": false
+    },
+    "zustand/middleware": {
+      "src": "../../node_modules/.pnpm/zustand@5.0.16_@types+react@19.3.0_react@19.3.1/node_modules/zustand/esm/middleware.mjs",
+      "file": "zustand_middleware.js",
+      "fileHash": "325fefde",
+      "needsInterop": false
+    }
+  },
+  "chunks": {
+    "react-Kms5jKd2": {
+      "file": "react-Kms5jKd2.js",
+      "isDynamicEntry": false
+    },
+    "rolldown-runtime-SbdDWaPq": {
+      "file": "rolldown-runtime-SbdDWaPq.js",
+      "isDynamicEntry": false
+    }
+  }
+}
