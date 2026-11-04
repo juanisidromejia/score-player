@@ -38,7 +38,13 @@ export function ScoreMetaEditor() {
           {current.tags.map((t) => (
             <span key={t} className="tag editable">
               {t}
-              <button onClick={() => removeTagFromScore(current.id, t)}>×</button>
+              <button
+                title={`Quitar tag ${t}`}
+                aria-label={`Quitar tag ${t}`}
+                onClick={() => removeTagFromScore(current.id, t)}
+              >
+                ×
+              </button>
             </span>
           ))}
           <input

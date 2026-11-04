@@ -167,6 +167,7 @@ export function ScoreList() {
                 <button
                   className="btn-icon danger"
                   title="Eliminar"
+                  aria-label={`Eliminar ${s.title}`}
                   onClick={(e) => {
                     e.stopPropagation()
                     if (confirm(`¿Eliminar "${s.title}"?`)) removeScore(s.id)

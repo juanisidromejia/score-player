@@ -29,8 +29,10 @@ interface AppState {
   searchQuery: string
   selectedRepertoire: string | null
   selectedTag: string | null
+  initialized: boolean
 
   setScores: (scores: ScoreMeta[]) => void
+  setInitialized: () => void
   addScore: (score: ScoreMeta) => void
   updateScore: (id: string, patch: Partial<ScoreMeta>) => void
   removeScore: (id: string) => void
@@ -62,8 +64,10 @@ export const useAppStore = create<AppState>()(
       searchQuery: '',
       selectedRepertoire: null,
       selectedTag: null,
+      initialized: false,
 
       setScores: (scores) => set({ scores }),
+      setInitialized: () => set({ initialized: true }),
       addScore: (score) => set((s) => ({ scores: [...s.scores, score] })),
       updateScore: (id, patch) =>
         set((s) => ({
@@ -152,6 +156,8 @@ export const useAppStore = create<AppState>()(
       partialize: (s) => ({
         scores: s.scores,
         playlists: s.playlists,
+        currentScoreId: s.currentScoreId,
+        initialized: s.initialized,
       }),
     }
   )

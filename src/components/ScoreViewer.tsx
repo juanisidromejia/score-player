@@ -19,6 +19,8 @@ export function ScoreViewer() {
     const paper = paperRef.current
     paper.innerHTML = ''
 
+    const staffwidth = Math.max(320, Math.floor(paper.clientWidth - 24) || 700)
+
     const visualObjs = abcjs.renderAbc(paper, current.abc, {
       responsive: 'resize',
       add_classes: true,
@@ -26,7 +28,7 @@ export function ScoreViewer() {
       paddingbottom: 10,
       paddingleft: 10,
       paddingright: 10,
-      staffwidth: 700,
+      staffwidth,
     })
 
     if (transposeSemitones !== 0 && visualObjs) {
@@ -43,7 +45,7 @@ export function ScoreViewer() {
         paddingbottom: 10,
         paddingleft: 10,
         paddingright: 10,
-        staffwidth: 700,
+        staffwidth,
       })
     }
   }, [current, transposeSemitones])

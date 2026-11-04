@@ -22,6 +22,27 @@ export function PresentationMode({ open, onClose }: Props) {
   const playerRef = useRef<Tone.Player | null>(null)
   const pitchShiftRef = useRef<Tone.PitchShift | null>(null)
   const objectUrlRef = useRef<string | null>(null)
+  const resumeOffsetRef = useRef(0)
+  const playStartedAtRef = useRef(0)
+  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearEndTimer = () => {
+    if (endTimerRef.current !== null) {
+      clearTimeout(endTimerRef.current)
+      endTimerRef.current = null
+    }
+  }
+
+  const recomputePages = useCallback(() => {
+    const container = pagesRef.current
+    const paper = paperRef.current
+    if (!container || !paper) return
+    const pageH = container.clientHeight
+    if (pageH <= 0) return
+    const pages = Math.max(1, Math.ceil(paper.scrollHeight / pageH))
+    setTotalPages(pages)
+    setPage((p) => Math.min(p, pages - 1))
+  }, [])
 
   const [page, setPage] = useState(0)
   const [totalPages, setTotalPages] = useState(1)
@@ -65,14 +86,22 @@ export function PresentationMode({ open, onClose }: Props) {
     requestAnimationFrame(() => {
       const container = pagesRef.current
       if (!container) return
-      const pageH = container.clientHeight
-      const contentH = paper.scrollHeight
-      const pages = Math.max(1, Math.ceil(contentH / pageH))
-      setTotalPages(pages)
-      setPage(0)
       container.scrollTop = 0
+      setPage(0)
+      recomputePages()
     })
-  }, [open, current, transposeSemitones])
+  }, [open, current, transposeSemitones, recomputePages])
+
+  // Recalcular páginas al redimensionar
+  useEffect(() => {
+    if (!open) return
+    const container = pagesRef.current
+    if (!container) return
+
+    const observer = new ResizeObserver(() => recomputePages())
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [open, recomputePages])
 
   // Audio en modo presentación
   useEffect(() => {
@@ -88,7 +117,6 @@ export function PresentationMode({ open, onClose }: Props) {
       try {
         const blob = await loadAudio(current!.id)
         if (cancelled || !blob) return
-        await Tone.start()
         const url = URL.createObjectURL(blob)
         objectUrlRef.current = url
 
@@ -125,6 +153,8 @@ export function PresentationMode({ open, onClose }: Props) {
   }, [transposeSemitones])
 
   function cleanupAudio() {
+    clearEndTimer()
+    resumeOffsetRef.current = 0
     if (playerRef.current) {
       try { playerRef.current.stop() } catch { /* */ }
       playerRef.current.dispose()
@@ -157,14 +187,32 @@ export function PresentationMode({ open, onClose }: Props) {
   const togglePlay = async () => {
     if (!playerRef.current || !audioReady) return
     await Tone.start()
+
+    const player = playerRef.current
+    const duration = player.buffer.duration
+
     if (isPlaying) {
-      playerRef.current.stop()
+      const elapsed = (Date.now() - playStartedAtRef.current) / 1000
+      resumeOffsetRef.current = Math.min(resumeOffsetRef.current + elapsed, duration)
+      player.stop()
+      clearEndTimer()
       setIsPlaying(false)
     } else {
-      playerRef.current.start()
+      if (resumeOffsetRef.current >= duration - 0.01) {
+        resumeOffsetRef.current = 0
+      }
+
+      player.start(Tone.now(), resumeOffsetRef.current)
+      playStartedAtRef.current = Date.now()
       setIsPlaying(true)
-      const dur = playerRef.current.buffer.duration
-      setTimeout(() => setIsPlaying(false), dur * 1000)
+
+      clearEndTimer()
+      const remaining = duration - resumeOffsetRef.current
+      endTimerRef.current = setTimeout(() => {
+        setIsPlaying(false)
+        resumeOffsetRef.current = 0
+        endTimerRef.current = null
+      }, remaining * 1000)
     }
   }
 

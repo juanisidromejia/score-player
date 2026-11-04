@@ -15,6 +15,16 @@ export function AudioPlayer() {
   const playerRef = useRef<Tone.Player | null>(null)
   const pitchShiftRef = useRef<Tone.PitchShift | null>(null)
   const objectUrlRef = useRef<string | null>(null)
+  const resumeOffsetRef = useRef(0)
+  const playStartedAtRef = useRef(0)
+  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const clearEndTimer = () => {
+    if (endTimerRef.current !== null) {
+      clearTimeout(endTimerRef.current)
+      endTimerRef.current = null
+    }
+  }
 
   const [isPlaying, setIsPlaying] = useState(false)
   const [isLoaded, setIsLoaded] = useState(false)
@@ -42,6 +52,8 @@ export function AudioPlayer() {
         URL.revokeObjectURL(objectUrlRef.current)
         objectUrlRef.current = null
       }
+      clearEndTimer()
+      resumeOffsetRef.current = 0
       setIsPlaying(false)
       setIsLoaded(false)
       setDuration(0)
@@ -56,7 +68,6 @@ export function AudioPlayer() {
           return
         }
 
-        await Tone.start()
         const url = URL.createObjectURL(blob)
         objectUrlRef.current = url
 
@@ -87,6 +98,7 @@ export function AudioPlayer() {
 
     return () => {
       cancelled = true
+      clearEndTimer()
       if (playerRef.current) {
         try { playerRef.current.stop() } catch { /* */ }
         playerRef.current.dispose()
@@ -114,16 +126,31 @@ export function AudioPlayer() {
     if (!playerRef.current || !isLoaded) return
     await Tone.start()
 
+    const player = playerRef.current
+    const duration = player.buffer.duration
+
     if (isPlaying) {
-      playerRef.current.stop()
+      const elapsed = (Date.now() - playStartedAtRef.current) / 1000
+      resumeOffsetRef.current = Math.min(resumeOffsetRef.current + elapsed, duration)
+      player.stop()
+      clearEndTimer()
       setIsPlaying(false)
     } else {
-      playerRef.current.start()
+      if (resumeOffsetRef.current >= duration - 0.01) {
+        resumeOffsetRef.current = 0
+      }
+
+      player.start(Tone.now(), resumeOffsetRef.current)
+      playStartedAtRef.current = Date.now()
       setIsPlaying(true)
-      const dur = playerRef.current.buffer.duration
-      setTimeout(() => {
+
+      clearEndTimer()
+      const remaining = duration - resumeOffsetRef.current
+      endTimerRef.current = setTimeout(() => {
         setIsPlaying(false)
-      }, dur * 1000)
+        resumeOffsetRef.current = 0
+        endTimerRef.current = null
+      }, remaining * 1000)
     }
   }
 

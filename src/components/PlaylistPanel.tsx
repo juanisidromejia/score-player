@@ -69,6 +69,7 @@ export function PlaylistPanel() {
             <button
               className="btn-icon danger"
               title="Eliminar set"
+              aria-label={`Eliminar set ${p.name}`}
               onClick={() => deletePlaylist(p.id)}
             >
               ×
@@ -94,6 +95,7 @@ export function PlaylistPanel() {
                   <button
                     className="btn-icon"
                     title="Quitar del set"
+                    aria-label={`Quitar ${sc.title} del set`}
                     onClick={(e) => {
                       e.stopPropagation()
                       removeScoreFromPlaylist(currentPlaylist.id, sid)

@@ -23,8 +23,8 @@ App ligera para músicos: colección de partituras + backing tracks con **transp
 ## Uso rápido
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
 ### Guardar audio
