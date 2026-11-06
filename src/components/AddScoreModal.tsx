@@ -15,7 +15,7 @@ export function AddScoreModal({ open, onClose }: Props) {
   const [abc, setAbc] = useState('')
   const [tags, setTags] = useState('')
   const [repertoire, setRepertoire] = useState('')
-  const [mode, setMode] = useState<'abc' | 'pack'>('abc')
+  const [mode, setMode] = useState<'abc' | 'pack'>('pack')
   const [importing, setImporting] = useState(false)
   const packInputRef = useRef<HTMLInputElement>(null)
 
@@ -78,7 +78,7 @@ export function AddScoreModal({ open, onClose }: Props) {
     setAbc('')
     setTags('')
     setRepertoire('')
-    setMode('abc')
+    setMode('pack')
   }
 
   return (
@@ -89,17 +89,17 @@ export function AddScoreModal({ open, onClose }: Props) {
         <div className="mode-tabs">
           <button
             type="button"
-            className={mode === 'abc' ? 'active' : ''}
-            onClick={() => setMode('abc')}
-          >
-            Pegar ABC
-          </button>
-          <button
-            type="button"
             className={mode === 'pack' ? 'active' : ''}
             onClick={() => setMode('pack')}
           >
             Importar combo (.scorepack)
+          </button>
+          <button
+            type="button"
+            className={mode === 'abc' ? 'active' : ''}
+            onClick={() => setMode('abc')}
+          >
+            Pegar ABC
           </button>
         </div>
 

@@ -3,6 +3,7 @@ import { ScoreList } from './components/ScoreList'
 import { ScoreViewer } from './components/ScoreViewer'
 import { TransposeControls } from './components/TransposeControls'
 import { PresentationMode } from './components/PresentationMode'
+import { UpdatePrompt } from './components/UpdatePrompt'
 import { useAppStore } from './store'
 import { sampleScores } from './data/sampleScores'
 import './App.css'
@@ -68,6 +69,7 @@ function App() {
         open={presentation}
         onClose={() => setPresentation(false)}
       />
+      <UpdatePrompt />
     </div>
   )
 }

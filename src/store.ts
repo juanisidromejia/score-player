@@ -36,7 +36,10 @@ interface AppState {
   addScore: (score: ScoreMeta) => void
   updateScore: (id: string, patch: Partial<ScoreMeta>) => void
   removeScore: (id: string) => void
-  setCurrentScore: (id: string | null) => void
+  setCurrentScore: (
+    id: string | null,
+    options?: { keepTranspose?: boolean }
+  ) => void
 
   setTranspose: (semitones: number) => void
   setSearchQuery: (q: string) => void
@@ -85,7 +88,11 @@ export const useAppStore = create<AppState>()(
           })),
         }))
       },
-      setCurrentScore: (id) => set({ currentScoreId: id, transposeSemitones: 0 }),
+      setCurrentScore: (id, options) =>
+        set((s) => ({
+          currentScoreId: id,
+          transposeSemitones: options?.keepTranspose ? s.transposeSemitones : 0,
+        })),
 
       setTranspose: (semitones) => set({ transposeSemitones: semitones }),
       setSearchQuery: (q) => set({ searchQuery: q }),

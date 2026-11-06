@@ -1,21 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../store'
+import { useVisibleScores } from '../lib/visibleScores'
 import { AddScoreModal } from './AddScoreModal'
 import { PlaylistPanel } from './PlaylistPanel'
 
-/** Quita acentos y pasa a minúsculas para buscar mejor */
-function normalize(text: string) {
-  return (text || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-}
-
 export function ScoreList() {
   const scores = useAppStore((s) => s.scores)
-  const playlists = useAppStore((s) => s.playlists)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
-  const currentPlaylistId = useAppStore((s) => s.currentPlaylistId)
   const setCurrentScore = useAppStore((s) => s.setCurrentScore)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
@@ -39,34 +30,7 @@ export function ScoreList() {
     return Array.from(set).sort()
   }, [scores])
 
-  const filtered = useMemo(() => {
-    let list = scores
-
-    // Si hay un set seleccionado, filtrar por él
-    if (currentPlaylistId) {
-      const pl = playlists.find((p) => p.id === currentPlaylistId)
-      if (pl) {
-        list = list.filter((s) => pl.scoreIds.includes(s.id))
-      }
-    }
-
-    const q = normalize(searchQuery)
-
-    return list.filter((s) => {
-      const matchSearch =
-        !q ||
-        normalize(s.title).includes(q) ||
-        normalize(s.repertoire).includes(q) ||
-        s.tags.some((t) => normalize(t).includes(q))
-
-      const matchRep =
-        !selectedRepertoire || s.repertoire === selectedRepertoire
-
-      const matchTag = !selectedTag || s.tags.includes(selectedTag)
-
-      return matchSearch && matchRep && matchTag
-    })
-  }, [scores, playlists, currentPlaylistId, searchQuery, selectedRepertoire, selectedTag])
+  const filtered = useVisibleScores()
 
   return (
     <aside className="score-list">
