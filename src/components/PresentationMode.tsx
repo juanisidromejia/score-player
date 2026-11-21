@@ -4,6 +4,7 @@ import * as Tone from 'tone'
 import { useAppStore } from '../store'
 import { loadAudio } from '../lib/audioStorage'
 import { getPresentationScores } from '../lib/visibleScores'
+import { computePageLayout } from '../lib/presentationLayout'
 
 interface Props {
   open: boolean
@@ -57,14 +58,24 @@ export function PresentationMode({ open, onClose }: Props) {
   const resumeOffsetRef = useRef(0)
   const playStartedAtRef = useRef(0)
   const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   const gestureRef = useRef<{
     x: number
     y: number
     axis: 'x' | 'y' | null
     id: number
+    isEdgeDrawer?: boolean
   } | null>(null)
   const swipeCooldownRef = useRef(0)
   const scrollRafRef = useRef<number | null>(null)
+
+  const [page, setPage] = useState(0)
+  const [pageOffsets, setPageOffsets] = useState<number[]>([0])
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [audioReady, setAudioReady] = useState(false)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const totalPages = Math.max(pageOffsets.length, 1)
 
   const clearEndTimer = () => {
     if (endTimerRef.current !== null) {
@@ -73,24 +84,66 @@ export function PresentationMode({ open, onClose }: Props) {
     }
   }
 
-  const recomputePages = useCallback(() => {
+  // Render abcjs score and compute layout/pages
+  const renderScore = useCallback(() => {
     const container = pagesRef.current
     const paper = paperRef.current
-    if (!container || !paper) return
-    const pageH = container.clientHeight
-    if (pageH <= 0) return
-    const pages = Math.max(1, Math.ceil(paper.scrollHeight / pageH))
-    setTotalPages(pages)
-    setPage((p) => Math.min(p, pages - 1))
-  }, [])
+    if (!open || !container || !paper || !current) return
 
-  const [page, setPage] = useState(0)
-  const [totalPages, setTotalPages] = useState(1)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [audioReady, setAudioReady] = useState(false)
-  const [showUi, setShowUi] = useState(true)
+    paper.innerHTML = ''
+    const containerW = container.clientWidth || window.innerWidth
+    const staffwidth = Math.max(280, containerW - 32)
 
-  // Si la partitura actual no pertenece a la lista de presentación, usar la primera
+    let abc = current.abc
+    const renderOpts: Record<string, unknown> = {
+      add_classes: true,
+      paddingtop: 12,
+      paddingbottom: 12,
+      paddingleft: 12,
+      paddingright: 12,
+      staffwidth,
+    }
+
+    const visualObjs = abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
+    if (transposeSemitones !== 0 && visualObjs) {
+      abc = abcjs.strTranspose(current.abc, visualObjs, transposeSemitones)
+      paper.innerHTML = ''
+      abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
+    }
+
+    // Ajustar SVG al ancho base antes de calcular layout
+    const svgEl = paper.querySelector('svg')
+    if (svgEl) {
+      svgEl.style.width = '100%'
+      svgEl.style.maxWidth = '1000px'
+      svgEl.style.height = 'auto'
+    }
+
+    // Calcular layout y paginación por sistemas tras un frame
+    requestAnimationFrame(() => {
+      if (!pagesRef.current || !paperRef.current) return
+      const containerH = pagesRef.current.clientHeight
+      const { offsets, scale } = computePageLayout(paperRef.current, containerH)
+      setPageOffsets(offsets)
+      setPage(0)
+      pagesRef.current.scrollTop = 0
+
+      // Aplicar escala mediante el ancho del SVG
+      const svg = paperRef.current.querySelector('svg') as HTMLElement | null
+      if (svg) {
+        const baseW = svg.getBoundingClientRect().width || svg.clientWidth || 800
+        const targetW = baseW * scale
+        svg.style.width = `${Math.round(targetW)}px`
+        svg.style.maxWidth = 'none'
+
+        // Recalcular offsets exactos tras aplicar la escala
+        const finalLayout = computePageLayout(paperRef.current, containerH)
+        setPageOffsets(finalLayout.offsets)
+      }
+    })
+  }, [open, current, transposeSemitones])
+
+  // Si la partitura actual no está en la lista de presentación, usar la primera
   useEffect(() => {
     if (!open || presentationScores.length === 0) return
     if (currentScoreId && presentationScores.some((s) => s.id === currentScoreId)) {
@@ -99,58 +152,22 @@ export function PresentationMode({ open, onClose }: Props) {
     setCurrentScore(presentationScores[0].id, { keepTranspose: true })
   }, [open, presentationScores, currentScoreId, setCurrentScore])
 
-  // Render partitura
   useEffect(() => {
-    if (!open || !paperRef.current || !current) return
+    renderScore()
+  }, [renderScore])
 
-    const paper = paperRef.current
-    paper.innerHTML = ''
-
-    let abc = current.abc
-    const visualObjs = abcjs.renderAbc(paper, abc, {
-      add_classes: true,
-      paddingtop: 20,
-      paddingbottom: 20,
-      paddingleft: 16,
-      paddingright: 16,
-      staffwidth: Math.min(window.innerWidth - 48, 900),
-      responsive: 'resize',
-    })
-
-    if (transposeSemitones !== 0 && visualObjs) {
-      abc = abcjs.strTranspose(current.abc, visualObjs, transposeSemitones)
-      paper.innerHTML = ''
-      abcjs.renderAbc(paper, abc, {
-        add_classes: true,
-        paddingtop: 20,
-        paddingbottom: 20,
-        paddingleft: 16,
-        paddingright: 16,
-        staffwidth: Math.min(window.innerWidth - 48, 900),
-        responsive: 'resize',
-      })
-    }
-
-    // Calcular páginas según altura del viewport
-    requestAnimationFrame(() => {
-      const container = pagesRef.current
-      if (!container) return
-      container.scrollTop = 0
-      setPage(0)
-      recomputePages()
-    })
-  }, [open, current, transposeSemitones, recomputePages])
-
-  // Recalcular páginas al redimensionar
+  // Recalcular al redimensionar
   useEffect(() => {
     if (!open) return
     const container = pagesRef.current
     if (!container) return
 
-    const observer = new ResizeObserver(() => recomputePages())
+    const observer = new ResizeObserver(() => {
+      renderScore()
+    })
     observer.observe(container)
     return () => observer.disconnect()
-  }, [open, recomputePages])
+  }, [open, renderScore])
 
   useEffect(() => {
     return () => {
@@ -232,14 +249,13 @@ export function PresentationMode({ open, onClose }: Props) {
   const goPage = useCallback(
     (delta: number) => {
       const container = pagesRef.current
-      if (!container) return
-      const pageH = container.clientHeight || 1
-      const currentPage = Math.round(container.scrollTop / pageH)
-      const next = Math.min(Math.max(0, currentPage + delta), totalPages - 1)
-      setPage(next)
-      container.scrollTo({ top: next * pageH, behavior: 'smooth' })
+      if (!container || pageOffsets.length === 0) return
+      const nextIndex = Math.min(Math.max(0, page + delta), pageOffsets.length - 1)
+      setPage(nextIndex)
+      const top = pageOffsets[nextIndex] || 0
+      container.scrollTo({ top, behavior: 'smooth' })
     },
-    [totalPages]
+    [page, pageOffsets]
   )
 
   const goSong = useCallback(
@@ -290,31 +306,40 @@ export function PresentationMode({ open, onClose }: Props) {
     }
   }
 
-  // Sincronizar el indicador de página con el scroll manual
+  // Sincronizar indicador de página con scroll manual
   const handleScroll = useCallback(() => {
     if (scrollRafRef.current !== null) return
 
     scrollRafRef.current = requestAnimationFrame(() => {
       scrollRafRef.current = null
       const container = pagesRef.current
-      if (!container) return
-      const pageH = container.clientHeight || 1
-      const next = Math.min(
-        Math.max(0, Math.round(container.scrollTop / pageH)),
-        totalPages - 1
-      )
-      setPage(next)
-    })
-  }, [totalPages])
+      if (!container || pageOffsets.length === 0) return
+      const scrollTop = container.scrollTop
 
-  // Gestos horizontales: cambiar de canción
+      // Buscar el offset de página más cercano
+      let closestIdx = 0
+      let minDiff = Infinity
+      for (let i = 0; i < pageOffsets.length; i++) {
+        const diff = Math.abs(scrollTop - pageOffsets[i])
+        if (diff < minDiff) {
+          minDiff = diff
+          closestIdx = i
+        }
+      }
+      setPage(closestIdx)
+    })
+  }, [pageOffsets])
+
+  // Gestos: swipe horizontal para cambiar canción y arrastre desde borde izquierdo para abrir drawer
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
+    const isEdge = e.clientX < 28 && !drawerOpen
     gestureRef.current = {
       x: e.clientX,
       y: e.clientY,
       axis: null,
       id: e.pointerId,
+      isEdgeDrawer: isEdge,
     }
   }
 
@@ -325,13 +350,19 @@ export function PresentationMode({ open, onClose }: Props) {
     const dx = e.clientX - gesture.x
     const dy = e.clientY - gesture.y
 
+    if (gesture.isEdgeDrawer && dx > 30) {
+      setDrawerOpen(true)
+      gestureRef.current = null
+      return
+    }
+
     if (!gesture.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       gesture.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
       if (gesture.axis === 'x') {
         try {
           e.currentTarget.setPointerCapture(e.pointerId)
         } catch {
-          /* pointer capture no disponible */
+          /* */
         }
       }
     }
@@ -361,12 +392,14 @@ export function PresentationMode({ open, onClose }: Props) {
     gestureRef.current = null
   }
 
-  // Teclado: flechas, espacio, Escape, T para ocultar UI
+  // Teclado
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
-      else if (e.key === 'ArrowRight') {
+      if (e.key === 'Escape') {
+        if (drawerOpen) setDrawerOpen(false)
+        else onClose()
+      } else if (e.key === 'ArrowRight') {
         e.preventDefault()
         goSong(1)
       } else if (e.key === 'ArrowLeft') {
@@ -383,7 +416,7 @@ export function PresentationMode({ open, onClose }: Props) {
         if (current?.hasAudio) togglePlay()
         else goPage(1)
       } else if (e.key === 'h' || e.key === 'H') {
-        setShowUi((v) => !v)
+        setDrawerOpen((v) => !v)
       } else if (e.key === '+' || e.key === '=') {
         setTranspose(transposeSemitones + 1)
       } else if (e.key === '-') {
@@ -396,6 +429,7 @@ export function PresentationMode({ open, onClose }: Props) {
     return () => window.removeEventListener('keydown', onKey)
   }, [
     open,
+    drawerOpen,
     goSong,
     goPage,
     onClose,
@@ -415,6 +449,16 @@ export function PresentationMode({ open, onClose }: Props) {
 
   return (
     <div className="presentation">
+      {/* Botón flotante para abrir el menú lateral */}
+      <button
+        className="presentation-menu-toggle"
+        onClick={() => setDrawerOpen(true)}
+        title="Abrir controles (H)"
+        aria-label="Abrir menú de controles"
+      >
+        ☰
+      </button>
+
       <div
         className="presentation-pages"
         ref={pagesRef}
@@ -431,20 +475,24 @@ export function PresentationMode({ open, onClose }: Props) {
         />
       </div>
 
-      {showUi && (
-        <div className="presentation-bar">
-          <div className="pres-left">
-            <button
-              className="pres-btn"
-              onClick={onClose}
-              title="Salir (Esc)"
-              aria-label="Salir de la presentación"
-            >
-              ✕ Salir
-            </button>
-            <span className="pres-title">{current.title}</span>
+      {/* Backdrop del drawer */}
+      {drawerOpen && (
+        <div
+          className="presentation-backdrop"
+          onClick={() => setDrawerOpen(false)}
+        />
+      )}
+
+      {/* Drawer lateral deslizable */}
+      <div
+        className={`presentation-drawer ${drawerOpen ? 'open' : ''}`}
+        aria-hidden={!drawerOpen}
+      >
+        <div className="drawer-header">
+          <div className="drawer-title-group">
+            <span className="drawer-title">{current.title}</span>
             <span
-              className="pres-set"
+              className="drawer-set"
               title={
                 activePlaylist
                   ? `Set: ${activePlaylist.name}`
@@ -454,105 +502,105 @@ export function PresentationMode({ open, onClose }: Props) {
               {activePlaylist ? activePlaylist.name : 'Todas'} · {songNumber}/{songCount}
             </span>
           </div>
+          <button
+            className="drawer-close"
+            onClick={() => setDrawerOpen(false)}
+            aria-label="Cerrar menú"
+          >
+            ✕
+          </button>
+        </div>
 
-          <div className="pres-center">
+        <div className="drawer-section">
+          <span className="drawer-label">Paginación ({page + 1} / {totalPages})</span>
+          <div className="drawer-row">
             <button
               className="pres-btn"
               onClick={() => goPage(-1)}
               disabled={page <= 0}
-              title="Página anterior (↑)"
-              aria-label="Página anterior"
             >
-              ↑
+              ↑ Página anterior
             </button>
-            <span className="pres-page">
-              {page + 1} / {totalPages}
-            </span>
             <button
               className="pres-btn"
               onClick={() => goPage(1)}
               disabled={page >= totalPages - 1}
-              title="Página siguiente (↓)"
-              aria-label="Página siguiente"
             >
-              ↓
-            </button>
-          </div>
-
-          <div className="pres-right">
-            {presentationScores.length > 1 && (
-              <div className="pres-song-nav">
-                <button
-                  className="pres-btn"
-                  onClick={() => goSong(-1)}
-                  title="Canción anterior (←)"
-                  aria-label="Canción anterior"
-                >
-                  ◀
-                </button>
-                <button
-                  className="pres-btn"
-                  onClick={() => goSong(1)}
-                  title="Canción siguiente (→)"
-                  aria-label="Canción siguiente"
-                >
-                  ▶
-                </button>
-              </div>
-            )}
-
-            <div className="pres-transpose">
-              <button
-                className="pres-btn"
-                onClick={() => setTranspose(transposeSemitones - 1)}
-                aria-label="Bajar un semitono"
-              >
-                −1
-              </button>
-              <span className="pres-pitch" title="Transporte (partitura + audio)">
-                {pitchLabel}
-              </span>
-              <button
-                className="pres-btn"
-                onClick={() => setTranspose(transposeSemitones + 1)}
-                aria-label="Subir un semitono"
-              >
-                +1
-              </button>
-            </div>
-
-            {current.hasAudio && (
-              <button
-                className="pres-btn play"
-                onClick={togglePlay}
-                disabled={!audioReady}
-                title="Play/Pause (Espacio)"
-                aria-label={isPlaying ? 'Pausar audio' : 'Reproducir audio'}
-              >
-                {isPlaying ? '⏸' : '▶'}
-              </button>
-            )}
-
-            <button
-              className="pres-btn"
-              onClick={() => setShowUi(false)}
-              title="Ocultar controles (H)"
-              aria-label="Ocultar controles"
-            >
-              Ocultar
+              ↓ Página siguiente
             </button>
           </div>
         </div>
-      )}
 
-      {!showUi && (
-        <button
-          className="presentation-tap"
-          onClick={() => setShowUi(true)}
-          title="Mostrar controles (H)"
-          aria-label="Mostrar controles"
-        />
-      )}
+        {presentationScores.length > 1 && (
+          <div className="drawer-section">
+            <span className="drawer-label">Navegación de canciones</span>
+            <div className="drawer-row">
+              <button
+                className="pres-btn"
+                onClick={() => goSong(-1)}
+              >
+                ◀ Anterior
+              </button>
+              <button
+                className="pres-btn"
+                onClick={() => goSong(1)}
+              >
+                Siguiente ▶
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="drawer-section">
+          <span className="drawer-label">Transporte ({pitchLabel})</span>
+          <div className="drawer-row">
+            <button
+              className="pres-btn"
+              onClick={() => setTranspose(transposeSemitones - 1)}
+            >
+              −1 Semitono
+            </button>
+            <button
+              className="pres-btn"
+              onClick={() => setTranspose(0)}
+              disabled={transposeSemitones === 0}
+            >
+              Reset
+            </button>
+            <button
+              className="pres-btn"
+              onClick={() => setTranspose(transposeSemitones + 1)}
+            >
+              +1 Semitono
+            </button>
+          </div>
+        </div>
+
+        {current.hasAudio && (
+          <div className="drawer-section">
+            <span className="drawer-label">Backing Track</span>
+            <button
+              className="pres-btn play-wide"
+              onClick={togglePlay}
+              disabled={!audioReady}
+            >
+              {isPlaying ? '⏸ Pausar Audio' : '▶ Reproducir Audio'}
+            </button>
+          </div>
+        )}
+
+        <div className="drawer-footer">
+          <button
+            className="pres-btn danger"
+            onClick={() => {
+              setDrawerOpen(false)
+              onClose()
+            }}
+          >
+            ✕ Salir de Presentación (Esc)
+          </button>
+        </div>
+      </div>
     </div>
   )
 }

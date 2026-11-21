@@ -58,6 +58,10 @@ ios/App/Pods/
 ios/App/build/
 DerivedData/
 
+# Documentación local de agentes
+/AGENTS.md
+/agentes.md
+
 # Varios
 *.tmp
 *.bak

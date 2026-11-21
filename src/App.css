@@ -1287,12 +1287,37 @@ body::before {
   background: radial-gradient(120% 80% at 50% -10%, #3a2f20 0%, transparent 55%), var(--ink-deep);
 }
 
+.presentation-menu-toggle {
+  position: fixed;
+  top: 0.85rem;
+  left: 0.85rem;
+  z-index: 210;
+  width: 42px;
+  height: 42px;
+  border-radius: var(--radius);
+  border: 1px solid var(--brass-dim);
+  background: rgba(34, 29, 24, 0.88);
+  color: var(--brass-bright);
+  font-size: 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(8px);
+  transition: all 0.18s var(--ease);
+}
+
+.presentation-menu-toggle:hover {
+  background: var(--surface-raised);
+  border-color: var(--brass);
+  transform: scale(1.04);
+}
+
 .presentation-pages {
   flex: 1;
   overflow-y: auto;
-  scroll-snap-type: y mandatory;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
   user-select: none;
   background: radial-gradient(70% 60% at 50% 45%, rgba(201, 162, 39, 0.08), transparent 70%);
 }
@@ -1302,18 +1327,15 @@ body::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.1rem;
-  scroll-snap-align: start;
+  justify-content: center;
+  padding: 2rem 1rem;
   color: var(--ink-text);
   animation: fade 0.25s var(--ease) both;
 }
 
 .presentation-paper > svg,
 .presentation-paper svg {
-  left: 50% !important;
-  transform: translateX(-50%);
-  width: min(100%, 980px);
-  max-width: 100%;
+  margin: 0 auto;
   height: auto;
   padding: 1.25rem;
   border-radius: var(--radius-sm);
@@ -1322,86 +1344,123 @@ body::before {
   box-shadow: var(--shadow-card);
 }
 
-.presentation-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  flex-wrap: wrap;
-  padding: 0.6rem 1rem;
-  padding-bottom: calc(0.6rem + env(safe-area-inset-bottom));
-  background: rgba(20, 17, 15, 0.96);
-  border-top: 1px solid var(--line);
-  box-shadow: 0 -1px 0 rgba(201, 162, 39, 0.16) inset;
+.presentation-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(13, 11, 9, 0.65);
+  backdrop-filter: blur(4px);
+  animation: fade 0.2s var(--ease) both;
 }
 
-.pres-left,
-.pres-center,
-.pres-right {
+.presentation-drawer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: min(340px, 85vw);
+  z-index: 230;
+  background: linear-gradient(180deg, var(--surface-raised), var(--ink-soft));
+  border-right: 1px solid var(--line);
+  box-shadow: var(--shadow-deep);
   display: flex;
-  align-items: center;
-  gap: 0.45rem;
+  flex-direction: column;
+  padding: 1.25rem;
+  gap: 1.25rem;
+  transform: translateX(-100%);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+}
+
+.presentation-drawer.open {
+  transform: translateX(0);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.drawer-title-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   min-width: 0;
 }
 
-.pres-title {
-  max-width: 220px;
+.drawer-title {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-display);
-  font-size: 0.98rem;
-  font-weight: 600;
 }
 
-.pres-set {
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0.14rem 0.55rem;
+.drawer-set {
+  padding: 0.15rem 0.55rem;
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--muted);
   font-family: var(--font-mono);
-  font-size: 0.64rem;
+  font-size: 0.68rem;
   letter-spacing: 0.04em;
+  width: fit-content;
 }
 
-.pres-song-nav {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.pres-page {
-  min-width: 3.8rem;
-  text-align: center;
-  font-family: var(--font-mono);
-  font-size: 0.78rem;
+.drawer-close {
+  background: none;
+  border: none;
   color: var(--muted);
-  font-variant-numeric: tabular-nums;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--radius-sm);
+  transition: color 0.15s;
 }
 
-.pres-pitch {
-  min-width: 3rem;
-  text-align: center;
+.drawer-close:hover {
+  color: var(--text);
+}
+
+.drawer-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.drawer-label {
   font-family: var(--font-mono);
-  font-weight: 600;
-  font-size: 0.86rem;
-  color: var(--brass-bright);
-  font-variant-numeric: tabular-nums;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-2);
+}
+
+.drawer-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.drawer-row button {
+  width: 100%;
 }
 
 .pres-btn {
-  min-height: 38px;
-  padding: 0.35rem 0.7rem;
+  min-height: 40px;
+  padding: 0.4rem 0.8rem;
   border-radius: var(--radius-sm);
   border: 1px solid var(--line);
   background: var(--surface);
   color: var(--text);
   font-family: var(--font-mono);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   cursor: pointer;
   font-weight: 500;
   transition: all 0.18s var(--ease);
@@ -1417,38 +1476,31 @@ body::before {
   cursor: default;
 }
 
-.pres-btn.play {
-  width: 2.55rem;
-  height: 2.55rem;
-  min-height: 0;
-  padding: 0;
-  border-radius: 50%;
-  border-color: var(--brass);
+.pres-btn.play-wide {
   background: var(--brass);
+  border-color: var(--brass);
   color: var(--ink);
-  font-size: 0.95rem;
+  font-weight: 600;
 }
 
-.pres-btn.play:hover:not(:disabled) {
+.pres-btn.play-wide:hover:not(:disabled) {
   filter: brightness(1.08);
-  color: var(--ink);
 }
 
-.pres-transpose {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
+.drawer-footer {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
 }
 
-.presentation-tap {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 52px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
+.pres-btn.danger {
+  border-color: rgba(163, 58, 47, 0.4);
+  color: #e8837a;
+}
+
+.pres-btn.danger:hover {
+  background: rgba(163, 58, 47, 0.15);
+  border-color: var(--oxblood);
 }
 
 .update-prompt {
