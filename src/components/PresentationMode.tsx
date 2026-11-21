@@ -92,15 +92,16 @@ export function PresentationMode({ open, onClose }: Props) {
 
     paper.innerHTML = ''
     const containerW = container.clientWidth || window.innerWidth
-    const staffwidth = Math.max(280, containerW - 32)
+    // Ancho base justo para la hoja, sin sobrar a los lados
+    const staffwidth = Math.max(240, containerW - 16)
 
     let abc = current.abc
     const renderOpts: Record<string, unknown> = {
       add_classes: true,
-      paddingtop: 12,
-      paddingbottom: 12,
-      paddingleft: 12,
-      paddingright: 12,
+      paddingtop: 6,
+      paddingbottom: 6,
+      paddingleft: 6,
+      paddingright: 6,
       staffwidth,
     }
 

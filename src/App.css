@@ -1317,6 +1317,7 @@ body::before {
 .presentation-pages {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   user-select: none;
   background: radial-gradient(70% 60% at 50% 45%, rgba(201, 162, 39, 0.08), transparent 70%);
@@ -1328,22 +1329,24 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1rem;
+  padding: 1.5rem 0.5rem;
   color: var(--ink-text);
   animation: fade 0.25s var(--ease) both;
 }
 
 .presentation-paper > svg,
 .presentation-paper svg {
+  display: block;
   margin: 0 auto;
   width: 100%;
   max-width: 100%;
   height: auto;
-  padding: 1.25rem;
+  padding: 0.75rem;
   border-radius: var(--radius-sm);
   background: var(--paper);
   border: 1px solid rgba(84, 66, 38, 0.2);
   box-shadow: var(--shadow-card);
+  box-sizing: border-box;
 }
 
 .presentation-backdrop {
