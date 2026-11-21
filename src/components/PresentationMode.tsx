@@ -111,35 +111,23 @@ export function PresentationMode({ open, onClose }: Props) {
       abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
     }
 
-    // Ajustar SVG al ancho base antes de calcular layout
+    // Ajustar SVG al ancho del contenedor: nunca se corta horizontalmente
     const svgEl = paper.querySelector('svg')
     if (svgEl) {
       svgEl.style.width = '100%'
-      svgEl.style.maxWidth = '1000px'
+      svgEl.style.maxWidth = '100%'
       svgEl.style.height = 'auto'
+      svgEl.style.transformOrigin = 'top center'
     }
 
     // Calcular layout y paginación por sistemas tras un frame
     requestAnimationFrame(() => {
       if (!pagesRef.current || !paperRef.current) return
       const containerH = pagesRef.current.clientHeight
-      const { offsets, scale } = computePageLayout(paperRef.current, containerH)
+      const { offsets } = computePageLayout(paperRef.current, containerH)
       setPageOffsets(offsets)
       setPage(0)
       pagesRef.current.scrollTop = 0
-
-      // Aplicar escala mediante el ancho del SVG
-      const svg = paperRef.current.querySelector('svg') as HTMLElement | null
-      if (svg) {
-        const baseW = svg.getBoundingClientRect().width || svg.clientWidth || 800
-        const targetW = baseW * scale
-        svg.style.width = `${Math.round(targetW)}px`
-        svg.style.maxWidth = 'none'
-
-        // Recalcular offsets exactos tras aplicar la escala
-        const finalLayout = computePageLayout(paperRef.current, containerH)
-        setPageOffsets(finalLayout.offsets)
-      }
     })
   }, [open, current, transposeSemitones])
 

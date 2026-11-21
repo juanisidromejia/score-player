@@ -13,7 +13,6 @@ export function computePageLayout(
   }
 
   const paperRect = paperEl.getBoundingClientRect()
-  // Recoger las posiciones relativas al papel
   const systemRects = systems.map((el) => {
     const r = el.getBoundingClientRect()
     return {
@@ -23,7 +22,7 @@ export function computePageLayout(
     }
   })
 
-  // Agrupar sistemas en páginas sin superar containerH (con un margen de seguridad vertical de 24px)
+  // Agrupar sistemas en páginas sin superar el alto del contenedor (margen de seguridad 24px)
   const maxH = Math.max(200, containerH - 24)
   const groupHeights: number[] = []
   let currentGroupHeight = 0
@@ -45,15 +44,16 @@ export function computePageLayout(
   }
 
   const maxPageH = Math.max(...groupHeights, 50)
-  // Escala para ajustar la página más alta al alto disponible (máximo 1.35 para partituras cortas, mínimo 0.45)
+  // Escala visual informativa (entre 0.45 y 1.35). No se aplica como transform para
+  // no desajustar las coordenadas de scroll; el SVG usa width: 100% y nunca se corta horizontal.
   const scale = Math.min(Math.max(containerH / maxPageH, 0.45), 1.35)
 
-  // Calcular offsets reales basados en los grupos iniciales multiplicados por la escala
+  // Offsets en coordenadas de flujo del documento (sin transform), válidos para scrollTo
   const offsets: number[] = [0]
   let accumulated = 0
   for (let i = 0; i < groupHeights.length; i++) {
     if (i > 0) {
-      accumulated += groupHeights[i - 1] * scale
+      accumulated += groupHeights[i - 1]
       offsets.push(accumulated)
     }
   }
