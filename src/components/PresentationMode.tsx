@@ -92,16 +92,16 @@ export function PresentationMode({ open, onClose }: Props) {
 
     paper.innerHTML = ''
     const containerW = container.clientWidth || window.innerWidth
-    // Ancho base justo para la hoja, sin sobrar a los lados
-    const staffwidth = Math.max(200, containerW - 8)
+    // Ancho base ajustado al contenedor para que no se salga a los lados
+    const staffwidth = Math.max(280, containerW - 24)
 
     let abc = current.abc
     const renderOpts: Record<string, unknown> = {
       add_classes: true,
-      paddingtop: 4,
-      paddingbottom: 4,
-      paddingleft: 4,
-      paddingright: 4,
+      paddingtop: 10,
+      paddingbottom: 10,
+      paddingleft: 10,
+      paddingright: 10,
       staffwidth,
     }
 
@@ -112,18 +112,15 @@ export function PresentationMode({ open, onClose }: Props) {
       abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
     }
 
-    // Forzar el SVG a comportarse como una hoja PDF: ancho del contenedor,
-    // centrado horizontalmente, sin desbordes a ningún lado.
+    // El SVG se ajusta al ancho del contenedor y se centra horizontalmente,
+    // sin desbordarse a los lados (como una hoja PDF).
     const svgEl = paper.querySelector('svg')
     if (svgEl) {
-      svgEl.removeAttribute('width')
-      svgEl.removeAttribute('height')
-      svgEl.style.setProperty('width', '100%', 'important')
-      svgEl.style.setProperty('max-width', '100%', 'important')
-      svgEl.style.setProperty('height', 'auto', 'important')
-      svgEl.style.setProperty('display', 'block', 'important')
-      svgEl.style.setProperty('margin', '0 auto', 'important')
-      svgEl.style.setProperty('overflow', 'hidden', 'important')
+      svgEl.style.width = '100%'
+      svgEl.style.maxWidth = '100%'
+      svgEl.style.height = 'auto'
+      svgEl.style.display = 'block'
+      svgEl.style.margin = '0 auto'
     }
 
     // Calcular layout y paginación por sistemas tras un frame
