@@ -1389,6 +1389,18 @@ body::before {
   animation: fade 0.25s var(--ease) both;
 }
 
+.score-placeholder {
+  max-width: 42rem;
+  margin: 2rem auto;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid rgba(84, 66, 38, 0.28);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--ink-text);
+  font-family: var(--font-ui);
+  text-align: center;
+}
+
 .presentation-paper > svg,
 .presentation-paper svg {
   width: 100%;

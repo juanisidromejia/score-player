@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { deleteAudio } from './lib/audioStorage'
+import { sampleScores } from './data/sampleScores'
 
 export interface ScoreMeta {
   id: string
@@ -11,6 +12,8 @@ export interface ScoreMeta {
   /** true si hay audio guardado en IndexedDB para este id */
   hasAudio?: boolean
   originalKey?: string
+  /** partitura guardada con la versión antigua de ABC, sin convertir */
+  legacyAbc?: string
 }
 
 export interface Playlist {
@@ -166,6 +169,20 @@ export const useAppStore = create<AppState>()(
         currentScoreId: s.currentScoreId,
         initialized: s.initialized,
       }),
+      merge: (persisted, current) => {
+        const state = (persisted ?? {}) as Partial<AppState>
+        const scores = (state.scores ?? current.scores).map((score) => {
+          const legacy = score as ScoreMeta & { abc?: string }
+          if (legacy.musicxml) return legacy
+
+          const sample = sampleScores.find((s) => s.id === legacy.id)
+          if (sample) return { ...legacy, musicxml: sample.musicxml }
+
+          return { ...legacy, musicxml: '', legacyAbc: legacy.abc }
+        })
+
+        return { ...current, ...state, scores }
+      },
     }
   )
 )

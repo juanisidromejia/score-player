@@ -95,6 +95,15 @@ export function PresentationMode({ open, onClose }: Props) {
     osmdRef.current?.dispose()
     paper.innerHTML = ''
 
+    if (!current.musicxml) {
+      paper.innerHTML =
+        '<p class="score-placeholder">Esta partitura se guardó en formato ABC antiguo. Vuelve a crearla en MusicXML o importa un .scorepack actualizado.</p>'
+      setPageOffsets([0])
+      setPage(0)
+      if (pagesRef.current) pagesRef.current.scrollTop = 0
+      return
+    }
+
     const osmd = new OpenSheetMusicDisplay(paper, {
       autoResize: false,
       backend: 'svg',

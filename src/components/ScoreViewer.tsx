@@ -20,6 +20,12 @@ export function ScoreViewer() {
     osmdRef.current?.dispose()
     container.innerHTML = ''
 
+    if (!current.musicxml) {
+      container.innerHTML =
+        '<p class="score-placeholder">Esta partitura se guardó en formato ABC antiguo. Vuelve a crearla en MusicXML o importa un .scorepack actualizado.</p>'
+      return
+    }
+
     const osmd = new OpenSheetMusicDisplay(container, {
       autoResize: false,
       backend: 'svg',
