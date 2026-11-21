@@ -7,7 +7,7 @@ export interface ScoreMeta {
   title: string
   tags: string[]
   repertoire: string
-  abc: string
+  musicxml: string
   /** true si hay audio guardado en IndexedDB para este id */
   hasAudio?: boolean
   originalKey?: string

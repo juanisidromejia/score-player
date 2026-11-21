@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useAppStore } from '../store'
 import { useVisibleScores } from '../lib/visibleScores'
 import { AddScoreModal } from './AddScoreModal'
@@ -18,6 +18,7 @@ export function ScoreList() {
 
   const [showAdd, setShowAdd] = useState(false)
   const [tab, setTab] = useState<'scores' | 'sets'>('scores')
+  const [menuOpen, setMenuOpen] = useState<{ id: string; x: number; y: number } | null>(null)
 
   const allTags = useMemo(() => {
     const set = new Set<string>()
@@ -31,6 +32,33 @@ export function ScoreList() {
   }, [scores])
 
   const filtered = useVisibleScores()
+
+  const handleDelete = (id: string, title: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setMenuOpen(null)
+    if (confirm(`¿Eliminar "${title}"?`)) {
+      removeScore(id)
+    }
+  }
+
+  const handleMenuClick = (e: React.MouseEvent, scoreId: string) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenuOpen({ id: scoreId, x: rect.left, y: rect.bottom })
+  }
+
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (target.closest('.context-menu') || target.closest('.btn-menu')) return
+      setMenuOpen(null)
+    }
+    document.addEventListener('mousedown', onClick)
+    return () => document.removeEventListener('mousedown', onClick)
+  }, [])
 
   return (
     <aside className="score-list">
@@ -129,16 +157,32 @@ export function ScoreList() {
                   )}
                 </div>
                 <button
-                  className="btn-icon danger"
-                  title="Eliminar"
-                  aria-label={`Eliminar ${s.title}`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm(`¿Eliminar "${s.title}"?`)) removeScore(s.id)
-                  }}
+                  className="btn-menu"
+                  title="Opciones"
+                  aria-label={`Opciones para ${s.title}`}
+                  onClick={(e) => handleMenuClick(e, s.id)}
                 >
-                  ×
+                  ⋮
                 </button>
+                {menuOpen && menuOpen.id === s.id && (
+                  <div className="context-menu" style={{ left: menuOpen.x, top: menuOpen.y }}>
+                    <button
+                      className="context-item"
+                      onClick={() => {
+                        setMenuOpen(null)
+                        setCurrentScore(s.id)
+                      }}
+                    >
+                      Ver partitura
+                    </button>
+                    <button
+                      className="context-item danger"
+                      onClick={(e) => handleDelete(s.id, s.title, e)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
             {filtered.length === 0 && (

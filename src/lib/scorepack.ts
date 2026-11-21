@@ -15,7 +15,7 @@ export interface ScorePack {
     title: string
     tags: string[]
     repertoire: string
-    abc: string
+    musicxml: string
     originalKey?: string
   }
   audio?: {
@@ -35,7 +35,7 @@ export async function buildScorePack(score: ScoreMeta): Promise<ScorePack> {
       title: score.title,
       tags: score.tags,
       repertoire: score.repertoire,
-      abc: score.abc,
+      musicxml: score.musicxml,
       originalKey: score.originalKey,
     },
   }
@@ -67,7 +67,7 @@ export async function importScorePack(
     title: pack.score.title,
     tags: pack.score.tags ?? [],
     repertoire: pack.score.repertoire || 'general',
-    abc: pack.score.abc,
+    musicxml: pack.score.musicxml,
     originalKey: pack.score.originalKey,
     hasAudio: !!pack.audio,
   }

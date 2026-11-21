@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import abcjs from 'abcjs'
+import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay'
 import * as Tone from 'tone'
 import { useAppStore } from '../store'
 import { loadAudio } from '../lib/audioStorage'
 import { getPresentationScores } from '../lib/visibleScores'
-import { computePageLayout } from '../lib/presentationLayout'
 
 interface Props {
   open: boolean
@@ -58,6 +57,8 @@ export function PresentationMode({ open, onClose }: Props) {
   const resumeOffsetRef = useRef(0)
   const playStartedAtRef = useRef(0)
   const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const osmdRef = useRef<OpenSheetMusicDisplay | null>(null)
+  const renderIdRef = useRef(0)
 
   const gestureRef = useRef<{
     x: number
@@ -84,55 +85,99 @@ export function PresentationMode({ open, onClose }: Props) {
     }
   }
 
-  // Render abcjs score and compute layout/pages
+  // Render MusicXML score con OSMD y calcular paginación
   const renderScore = useCallback(() => {
     const container = pagesRef.current
     const paper = paperRef.current
     if (!open || !container || !paper || !current) return
 
+    const renderId = ++renderIdRef.current
+    osmdRef.current?.dispose()
     paper.innerHTML = ''
-    const containerW = container.clientWidth || window.innerWidth
-    // Ancho base ajustado al contenedor para que no se salga a los lados
-    const staffwidth = Math.max(280, containerW - 24)
 
-    let abc = current.abc
-    const renderOpts: Record<string, unknown> = {
-      add_classes: true,
-      paddingtop: 10,
-      paddingbottom: 10,
-      paddingleft: 10,
-      paddingright: 10,
-      staffwidth,
-    }
-
-    const visualObjs = abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
-    if (transposeSemitones !== 0 && visualObjs) {
-      abc = abcjs.strTranspose(current.abc, visualObjs, transposeSemitones)
-      paper.innerHTML = ''
-      abcjs.renderAbc(paper, abc, renderOpts as Record<string, unknown>)
-    }
-
-    // El SVG se ajusta al ancho del contenedor y se centra horizontalmente,
-    // sin desbordarse a los lados (como una hoja PDF).
-    const svgEl = paper.querySelector('svg')
-    if (svgEl) {
-      svgEl.style.width = '100%'
-      svgEl.style.maxWidth = '100%'
-      svgEl.style.height = 'auto'
-      svgEl.style.display = 'block'
-      svgEl.style.margin = '0 auto'
-    }
-
-    // Calcular layout y paginación por sistemas tras un frame
-    requestAnimationFrame(() => {
-      if (!pagesRef.current || !paperRef.current) return
-      const containerH = pagesRef.current.clientHeight
-      const { offsets } = computePageLayout(paperRef.current, containerH)
-      setPageOffsets(offsets)
-      setPage(0)
-      pagesRef.current.scrollTop = 0
+    const osmd = new OpenSheetMusicDisplay(paper, {
+      autoResize: false,
+      backend: 'svg',
     })
-  }, [open, current, transposeSemitones])
+    osmdRef.current = osmd
+
+    osmd
+      .load(current.musicxml)
+      .then(() => {
+        if (renderId !== renderIdRef.current) return
+        osmd.render()
+      })
+      .then(() => {
+        if (renderId !== renderIdRef.current) return
+        if (!pagesRef.current || !paperRef.current) return
+        const containerH = pagesRef.current.clientHeight
+        const svgEls = Array.from(paper.querySelectorAll('svg'))
+        if (svgEls.length === 0) return
+
+        const paperRect = paper.getBoundingClientRect()
+
+        svgEls.forEach((svgEl) => {
+          svgEl.style.width = '100%'
+          svgEl.style.maxWidth = '100%'
+          svgEl.style.height = 'auto'
+          svgEl.style.display = 'block'
+          svgEl.style.margin = '0 auto'
+        })
+
+        const paperHeight = paper.scrollHeight
+        const systems = Array.from(paper.querySelectorAll('svg g')).filter((g) => {
+          const cls = (g.getAttribute('class') || '').toLowerCase()
+          return cls.includes('staff') || cls.includes('system')
+        })
+
+        const maxH = Math.max(200, containerH - 24)
+        let offsets: number[]
+
+        if (systems.length > 0) {
+          // Agrupar sistemas completos hasta llenar cada pantalla.
+          offsets = [0]
+          let groupTop = systems[0].getBoundingClientRect().top - paperRect.top
+          let groupBottom = 0
+
+          systems.forEach((system) => {
+            const rect = system.getBoundingClientRect()
+            const top = rect.top - paperRect.top
+            const bottom = rect.bottom - paperRect.top
+
+            if (groupBottom > 0 && bottom - groupTop > maxH) {
+              offsets.push(top)
+              groupTop = top
+            }
+            groupBottom = bottom
+          })
+        } else {
+          const pageCount = Math.max(1, Math.ceil(paperHeight / maxH))
+          offsets = Array.from({ length: pageCount }, (_, i) => i * maxH)
+        }
+
+        if (offsets.length <= 1 && paperHeight > maxH) {
+          const pageCount = Math.ceil(paperHeight / maxH)
+          offsets = Array.from({ length: pageCount }, (_, i) => i * maxH)
+        }
+
+        if (offsets.length <= 1 || paperHeight <= maxH) {
+          setPageOffsets([0])
+          setPage(0)
+          pagesRef.current.scrollTop = 0
+          return
+        }
+
+        setPageOffsets(offsets)
+        setPage(0)
+        pagesRef.current.scrollTop = 0
+      })
+      .catch((err: unknown) => {
+        if (renderId !== renderIdRef.current) return
+        console.error('Error renderizando MusicXML con OSMD:', err)
+        paper.innerHTML =
+          '<p style="color: var(--text); text-align: center; padding: 2rem;">Error al cargar la partitura</p>'
+      })
+  }, [open, current])
 
   // Si la partitura actual no está en la lista de presentación, usar la primera
   useEffect(() => {
@@ -244,7 +289,7 @@ export function PresentationMode({ open, onClose }: Props) {
       const nextIndex = Math.min(Math.max(0, page + delta), pageOffsets.length - 1)
       setPage(nextIndex)
       const top = pageOffsets[nextIndex] || 0
-      container.scrollTo({ top, behavior: 'smooth' })
+      container.scrollTo({ top })
     },
     [page, pageOffsets]
   )

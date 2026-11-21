@@ -12,10 +12,10 @@ export function AddScoreModal({ open, onClose }: Props) {
   const setCurrentScore = useAppStore((s) => s.setCurrentScore)
 
   const [title, setTitle] = useState('')
-  const [abc, setAbc] = useState('')
+  const [musicxml, setMusicXml] = useState('')
   const [tags, setTags] = useState('')
   const [repertoire, setRepertoire] = useState('')
-  const [mode, setMode] = useState<'abc' | 'pack'>('pack')
+  const [mode, setMode] = useState<'musicxml' | 'pack'>('pack')
   const [importing, setImporting] = useState(false)
   const packInputRef = useRef<HTMLInputElement>(null)
 
@@ -23,11 +23,11 @@ export function AddScoreModal({ open, onClose }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!abc.trim()) return
+    if (!musicxml.trim()) return
 
     let finalTitle = title.trim()
     if (!finalTitle) {
-      const match = abc.match(/^T:\s*(.+)$/m)
+      const match = musicxml.match(/<part-name>([^<]+)<\/part-name>/)
       finalTitle = match ? match[1].trim() : 'Sin título'
     }
 
@@ -42,7 +42,7 @@ export function AddScoreModal({ open, onClose }: Props) {
       title: finalTitle,
       tags: tagList,
       repertoire: repertoire.trim() || 'general',
-      abc: abc.trim(),
+      musicxml: musicxml.trim(),
       hasAudio: false,
     })
 
@@ -75,7 +75,7 @@ export function AddScoreModal({ open, onClose }: Props) {
 
   const reset = () => {
     setTitle('')
-    setAbc('')
+    setMusicXml('')
     setTags('')
     setRepertoire('')
     setMode('pack')
@@ -96,10 +96,10 @@ export function AddScoreModal({ open, onClose }: Props) {
           </button>
           <button
             type="button"
-            className={mode === 'abc' ? 'active' : ''}
-            onClick={() => setMode('abc')}
+            className={mode === 'musicxml' ? 'active' : ''}
+            onClick={() => setMode('musicxml')}
           >
-            Pegar ABC
+            Pegar MusicXML
           </button>
         </div>
 
@@ -132,7 +132,7 @@ export function AddScoreModal({ open, onClose }: Props) {
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Se toma del ABC si lo dejas vacío"
+                placeholder="Se toma del MusicXML si lo dejas vacío"
               />
             </label>
 
@@ -155,12 +155,28 @@ export function AddScoreModal({ open, onClose }: Props) {
             </label>
 
             <label>
-              Código ABC *
+              Código MusicXML *
               <textarea
-                value={abc}
-                onChange={(e) => setAbc(e.target.value)}
-                rows={10}
-                placeholder={`X:1\nT:Mi canción\nM:4/4\nL:1/4\nK:C\nC D E F | G A B c |`}
+                value={musicxml}
+                onChange={(e) => setMusicXml(e.target.value)}
+                rows={12}
+                placeholder={`<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Mi canción</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>0</fifths></key>
+        <time><beats>4</beats><beat-type>4</beat-type></time>
+        <clef><sign>G</sign><line>2</line></clef>
+      </attributes>
+      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
+    </measure>
+  </part>
+</score-partwise>`}
                 required
               />
             </label>

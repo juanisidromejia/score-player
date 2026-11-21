@@ -1,54 +1,50 @@
 import { useEffect, useRef } from 'react'
-import abcjs from 'abcjs'
+import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay'
 import { useAppStore } from '../store'
 import { ScoreMetaEditor } from './ScoreMetaEditor'
 import { AudioPlayer } from './AudioPlayer'
 
 export function ScoreViewer() {
   const paperRef = useRef<HTMLDivElement>(null)
+  const osmdRef = useRef<OpenSheetMusicDisplay | null>(null)
 
   const scores = useAppStore((s) => s.scores)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
-  const transposeSemitones = useAppStore((s) => s.transposeSemitones)
 
   const current = scores.find((s) => s.id === currentScoreId)
 
   useEffect(() => {
     if (!paperRef.current || !current) return
 
-    const paper = paperRef.current
-    paper.innerHTML = ''
+    const container = paperRef.current
+    osmdRef.current?.dispose()
+    container.innerHTML = ''
 
-    const staffwidth = Math.max(320, Math.floor(paper.clientWidth - 24) || 700)
-
-    const visualObjs = abcjs.renderAbc(paper, current.abc, {
-      responsive: 'resize',
-      add_classes: true,
-      paddingtop: 10,
-      paddingbottom: 10,
-      paddingleft: 10,
-      paddingright: 10,
-      staffwidth,
+    const osmd = new OpenSheetMusicDisplay(container, {
+      autoResize: false,
+      backend: 'svg',
     })
+    osmdRef.current = osmd
 
-    if (transposeSemitones !== 0 && visualObjs) {
-      const transposedAbc = abcjs.strTranspose(
-        current.abc,
-        visualObjs,
-        transposeSemitones
-      )
-      paper.innerHTML = ''
-      abcjs.renderAbc(paper, transposedAbc, {
-        responsive: 'resize',
-        add_classes: true,
-        paddingtop: 10,
-        paddingbottom: 10,
-        paddingleft: 10,
-        paddingright: 10,
-        staffwidth,
+    let cancelled = false
+    osmd
+      .load(current.musicxml)
+      .then(() => {
+        if (!cancelled) osmd.render()
       })
+      .catch((err: unknown) => {
+        if (cancelled) return
+        console.error('Error renderizando MusicXML con OSMD:', err)
+        container.innerHTML =
+          '<p style="color: var(--text); text-align: center; padding: 2rem;">Error al cargar la partitura</p>'
+      })
+
+    return () => {
+      cancelled = true
+      osmd.dispose()
+      if (osmdRef.current === osmd) osmdRef.current = null
     }
-  }, [current, transposeSemitones])
+  }, [current])
 
   if (!current) {
     return (
@@ -74,7 +70,7 @@ export function ScoreViewer() {
       <ScoreMetaEditor />
       <AudioPlayer />
 
-      <div ref={paperRef} className="abc-paper" />
+      <div ref={paperRef} className="musicxml-paper" />
     </div>
   )
 }
