@@ -1328,25 +1328,26 @@ body::before {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  padding: 1.5rem 0.5rem;
+  justify-content: flex-start;
+  padding: 0.5rem 0;
   color: var(--ink-text);
   animation: fade 0.25s var(--ease) both;
 }
 
 .presentation-paper > svg,
 .presentation-paper svg {
-  display: block;
-  margin: 0 auto;
-  width: 100%;
-  max-width: 100%;
-  height: auto;
-  padding: 0.75rem;
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin: 0 auto !important;
+  padding: 0.5rem !important;
   border-radius: var(--radius-sm);
   background: var(--paper);
   border: 1px solid rgba(84, 66, 38, 0.2);
   box-shadow: var(--shadow-card);
-  box-sizing: border-box;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
 }
 
 .presentation-backdrop {
