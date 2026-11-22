@@ -12,6 +12,7 @@ interface Props {
 export function ScoreViewer({ onBack, onPresent }: Props) {
   const scores = useAppStore((s) => s.scores)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
+  const previewNavigation = useAppStore((s) => s.previewNavigation)
   const current = scores.find((s) => s.id === currentScoreId)
 
   if (!current) {
@@ -29,8 +30,8 @@ export function ScoreViewer({ onBack, onPresent }: Props) {
           <button
             className="preview-back"
             onClick={onBack}
-            title="Volver a la biblioteca"
-            aria-label="Volver a la biblioteca"
+            title={previewNavigation.origin === 'set' ? 'Volver al Set' : 'Volver a la biblioteca'}
+            aria-label={previewNavigation.origin === 'set' ? 'Volver al Set' : 'Volver a la biblioteca'}
           >
             ‹
           </button>
