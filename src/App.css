@@ -2673,7 +2673,7 @@ body::before {
   }
 
   .playlist-detail {
-    max-height: none;
+    max-height: 52%;
   }
 }
 
@@ -2800,5 +2800,25 @@ body::before {
 
   .modal {
     padding: 1.15rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .modal-actions {
+    flex-wrap: wrap;
+  }
+
+  .modal-actions button {
+    flex: 1 1 140px;
+    min-height: 44px;
+  }
+
+  .playlist-remove {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .modal.selector-modal {
+    max-height: 92dvh;
   }
 }
