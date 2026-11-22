@@ -2897,3 +2897,196 @@ body::before {
     max-height: 92dvh;
   }
 }
+
+
+/* ============================================================
+   Mobile design — navegación por pantallas
+   ============================================================ */
+
+.mobile-screen-nav {
+  display: none;
+}
+
+@media (max-width: 860px) {
+  .app {
+    min-height: 100dvh;
+  }
+
+  .app-main {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .score-list {
+    border-bottom: 0;
+  }
+
+  .list-tabs {
+    min-height: 42px;
+    justify-content: flex-end;
+  }
+
+  .list-tabs button:not(.list-admin-toggle) {
+    display: none;
+  }
+
+  .list-tabs .list-admin-toggle {
+    flex: 0 0 48px;
+    min-height: 42px;
+    margin-left: auto;
+    border-bottom: 0;
+  }
+
+  .mobile-screen-nav {
+    position: relative;
+    z-index: 15;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 0 0 auto;
+    padding: 0.35rem 0.5rem calc(0.35rem + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    background: rgba(20, 17, 15, 0.98);
+    box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  .mobile-screen-nav button {
+    min-width: 0;
+    min-height: 54px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.15rem;
+    padding: 0.3rem 0.2rem;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 0.68rem;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-screen-nav button.active {
+    border-color: rgba(201, 162, 39, 0.2);
+    background: rgba(201, 162, 39, 0.1);
+    color: var(--brass-bright);
+  }
+
+  .mobile-screen-nav button:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  .mobile-nav-icon {
+    font-size: 1.15rem;
+    line-height: 1.1;
+  }
+
+  .app--preview .app-header {
+    flex: 0 0 auto;
+  }
+
+  .app--preview .viewer-area {
+    padding-top: 0.65rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-header {
+    min-height: 56px;
+  }
+
+  .brand-tag {
+    display: none;
+  }
+
+  .app--preview .brand-text h1 {
+    font-size: 0.98rem;
+  }
+
+  .score-list {
+    background: var(--ink);
+  }
+
+  .search-box {
+    padding-top: 0.65rem;
+  }
+
+  .search-box input {
+    min-height: 46px;
+    font-size: 16px;
+  }
+
+  .score-list li {
+    min-height: 66px;
+    align-items: center;
+  }
+
+  .score-list li strong {
+    font-size: 1rem;
+  }
+
+  .filter-row button {
+    min-height: 36px;
+  }
+
+  .playlist-header {
+    min-height: 58px;
+  }
+
+  .playlist-item {
+    min-height: 56px;
+    font-size: 0.94rem;
+  }
+
+  .set-view-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    padding: 0.25rem 0;
+    background: var(--surface);
+  }
+
+  .set-view-actions {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 0.25rem 0 0.65rem;
+    background: linear-gradient(180deg, var(--surface) 82%, transparent);
+  }
+
+  .set-present-btn,
+  .playlist-add-btn {
+    min-height: 48px;
+  }
+
+  .score-viewer {
+    padding-bottom: calc(1rem + env(safe-area-inset-bottom));
+  }
+
+  .preview-toolbar {
+    align-items: center;
+  }
+
+  .preview-toolbar .score-header {
+    text-align: left;
+  }
+
+  .preview-meta {
+    justify-content: flex-start;
+  }
+
+  .score-preview-paper {
+    max-height: min(58dvh, 620px);
+    padding: 0.45rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mobile-screen-nav button {
+    transition: none;
+  }
+}
