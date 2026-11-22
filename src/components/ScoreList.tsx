@@ -5,11 +5,13 @@ import { ManageScoresModal } from './ManageScoresModal'
 import { PlaylistPanel } from './PlaylistPanel'
 
 interface Props {
+  activeTab?: 'scores' | 'sets'
+  onTabChange?: (tab: 'scores' | 'sets') => void
   onSelectScore?: () => void
   onPresent?: () => void
 }
 
-export function ScoreList({ onSelectScore, onPresent }: Props) {
+export function ScoreList({ activeTab, onTabChange, onSelectScore, onPresent }: Props) {
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const openScore = useAppStore((s) => s.openScore)
   const searchQuery = useAppStore((s) => s.searchQuery)
@@ -25,7 +27,12 @@ export function ScoreList({ onSelectScore, onPresent }: Props) {
 
   const [showManage, setShowManage] = useState(false)
   const [showMoreFilters, setShowMoreFilters] = useState(false)
-  const [tab, setTab] = useState<'scores' | 'sets'>('scores')
+  const [localTab, setLocalTab] = useState<'scores' | 'sets'>('scores')
+  const tab = activeTab ?? localTab
+  const changeTab = (next: 'scores' | 'sets') => {
+    setLocalTab(next)
+    onTabChange?.(next)
+  }
 
   const allTags = useMemo(() => {
     const set = new Set<string>()
@@ -63,13 +70,13 @@ export function ScoreList({ onSelectScore, onPresent }: Props) {
       <div className="list-tabs">
         <button
           className={tab === 'scores' ? 'active' : ''}
-          onClick={() => setTab('scores')}
+          onClick={() => changeTab('scores')}
         >
           Partituras
         </button>
         <button
           className={tab === 'sets' ? 'active' : ''}
-          onClick={() => setTab('sets')}
+          onClick={() => changeTab('sets')}
         >
           Sets
         </button>
