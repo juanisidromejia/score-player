@@ -1,62 +1,58 @@
-export interface PageLayout {
-  offsets: number[]
-  scale: number
+export interface SystemRect {
+  top: number
+  bottom: number
 }
 
+export interface PageLayout {
+  offsets: number[]
+  counts: number[]
+}
+
+const PAGE_PADDING = 12
+const MIN_USABLE_HEIGHT = 120
+
+/**
+ * Agrupa sistemas completos en páginas. El origen de cada página es la coordenada
+ * del documento que se alinea con el borde superior del contenedor: 0 en la
+ * primera y el primer sistema de cada grupo en las demás. Medir el grupo desde
+ * su primer sistema daría por buena una página cuyo contenido cae por debajo
+ * del contenedor, porque la cabecera inicial de OSMD no se tiene en cuenta.
+ * No se aplica escala: los offsets son coordenadas de flujo para translateY.
+ */
 export function computePageLayout(
-  paperEl: HTMLElement,
-  containerH: number
+  systems: SystemRect[],
+  containerH: number,
+  paperHeight: number
 ): PageLayout {
-  const systems = Array.from(paperEl.querySelectorAll<HTMLElement>('g.abcjs-staff-wrapper'))
-  if (systems.length === 0 || containerH <= 0) {
-    return { offsets: [0], scale: 1 }
+  if (containerH <= 0) {
+    return { offsets: [0], counts: [Math.max(systems.length, 1)] }
   }
 
-  const paperRect = paperEl.getBoundingClientRect()
-  const systemRects = systems.map((el) => {
-    const r = el.getBoundingClientRect()
+  const usableH = Math.max(MIN_USABLE_HEIGHT, containerH - PAGE_PADDING * 2)
+
+  if (systems.length === 0) {
+    const count = Math.max(1, Math.ceil(paperHeight / usableH))
     return {
-      top: r.top - paperRect.top,
-      bottom: r.bottom - paperRect.top,
-      height: r.height,
+      offsets: Array.from({ length: count }, (_, i) => i * usableH),
+      counts: Array.from({ length: count }, () => 1),
     }
+  }
+
+  const offsets = [0]
+  const counts: number[] = []
+  let pageOrigin = 0
+  let count = 0
+
+  systems.forEach((system, i) => {
+    if (i > 0 && count > 0 && system.bottom - pageOrigin > usableH) {
+      counts.push(count)
+      pageOrigin = Math.max(0, system.top - PAGE_PADDING)
+      offsets.push(pageOrigin)
+      count = 0
+    }
+    count++
   })
+  counts.push(count)
 
-  // Agrupar sistemas en páginas sin superar el alto del contenedor (margen de seguridad 24px)
-  const maxH = Math.max(200, containerH - 24)
-  const groupHeights: number[] = []
-  let currentGroupHeight = 0
-  let firstInGroup = systemRects[0].top
-
-  for (let i = 0; i < systemRects.length; i++) {
-    const s = systemRects[i]
-    const nextH = currentGroupHeight === 0 ? s.bottom - firstInGroup : s.bottom - firstInGroup
-    if (currentGroupHeight > 0 && nextH > maxH) {
-      groupHeights.push(currentGroupHeight)
-      firstInGroup = s.top
-      currentGroupHeight = s.bottom - s.top
-    } else {
-      currentGroupHeight = nextH
-    }
-  }
-  if (currentGroupHeight > 0) {
-    groupHeights.push(currentGroupHeight)
-  }
-
-  const maxPageH = Math.max(...groupHeights, 50)
-  // Escala visual informativa (entre 0.45 y 1.35). No se aplica como transform para
-  // no desajustar las coordenadas de scroll; el SVG usa width: 100% y nunca se corta horizontal.
-  const scale = Math.min(Math.max(containerH / maxPageH, 0.45), 1.35)
-
-  // Offsets en coordenadas de flujo del documento (sin transform), válidos para scrollTo
-  const offsets: number[] = [0]
-  let accumulated = 0
-  for (let i = 0; i < groupHeights.length; i++) {
-    if (i > 0) {
-      accumulated += groupHeights[i - 1]
-      offsets.push(accumulated)
-    }
-  }
-
-  return { offsets, scale }
+  return { offsets, counts }
 }

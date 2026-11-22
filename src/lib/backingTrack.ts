@@ -107,8 +107,17 @@ function disposeAudio() {
   }
 }
 
-export async function loadBackingTrack(scoreId: string | null) {
-  if (state.scoreId === scoreId && (state.loaded || state.loading)) return
+export async function loadBackingTrack(
+  scoreId: string | null,
+  options?: { force?: boolean }
+) {
+  if (
+    !options?.force &&
+    state.scoreId === scoreId &&
+    (state.loaded || state.loading)
+  ) {
+    return
+  }
   const token = ++loadToken
 
   disposeAudio()

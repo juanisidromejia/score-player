@@ -2155,16 +2155,17 @@ body::before {
 .presentation {
   position: fixed;
   inset: 0;
+  height: 100dvh;
   z-index: 200;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
   background: radial-gradient(120% 80% at 50% -10%, #3a2f20 0%, transparent 55%), var(--ink-deep);
 }
 
 .presentation-topbar {
   position: relative;
   z-index: 210;
-  flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -2235,7 +2236,6 @@ body::before {
 .presentation-audio-bar {
   position: relative;
   z-index: 210;
-  flex: 0 0 auto;
   padding: 0.25rem 0.75rem calc(0.3rem + env(safe-area-inset-bottom));
   background: linear-gradient(0deg, rgba(20, 17, 15, 0.98), rgba(34, 29, 24, 0.95));
   border-top: 1px solid var(--line);
@@ -2346,7 +2346,8 @@ body::before {
 }
 
 .presentation-pages {
-  flex: 1;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
   touch-action: none;
   user-select: none;
@@ -2404,18 +2405,18 @@ body::before {
 .presentation-drawer {
   position: fixed;
   top: 0;
-  left: 0;
+  right: 0;
   bottom: 0;
   width: min(340px, 70vw);
   z-index: 230;
   background: linear-gradient(180deg, var(--surface-raised), var(--ink-soft));
-  border-right: 1px solid var(--line);
+  border-left: 1px solid var(--line);
   box-shadow: var(--shadow-deep);
   display: flex;
   flex-direction: column;
   padding: calc(1.25rem + env(safe-area-inset-top)) 1.25rem calc(1.25rem + env(safe-area-inset-bottom));
   gap: 1.25rem;
-  transform: translateX(-100%);
+  transform: translateX(100%);
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   overflow-y: auto;
 }

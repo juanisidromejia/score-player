@@ -43,10 +43,12 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff,woff2,webmanifest}'],
+        globPatterns: [
+          '**/*.{js,css,html,svg,png,woff,woff2,webmanifest,json,xml,musicxml,mp3}',
+        ],
         navigateFallback: 'index.html',
         cleanupOutdatedCaches: true,
-        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
+        maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
   ],

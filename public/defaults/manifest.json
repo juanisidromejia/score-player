@@ -1,0 +1,22 @@
+{
+  "scores": [
+    {
+      "id": "score-1795376081916",
+      "title": "Viva la Vida",
+      "tags": [],
+      "repertoire": "general",
+      "originalKey": "C",
+      "musicxml": "viva-la-vida.musicxml",
+      "audio": "viva-la-vida.mp3"
+    },
+    {
+      "id": "score-1795381624259",
+      "title": "Canon de Pachebell",
+      "tags": [],
+      "repertoire": "general",
+      "originalKey": "D",
+      "musicxml": "canon-de-pachebell.musicxml",
+      "audio": "canon-de-pachebell.mp3"
+    }
+  ]
+}

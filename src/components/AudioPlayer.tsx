@@ -57,6 +57,7 @@ export function AudioPlayer() {
     setTrack((prev) => ({ ...prev, loading: true }))
     try {
       await saveAudio(current.id, file)
+      await loadBackingTrack(current.id, { force: true })
       updateScore(current.id, { hasAudio: true })
     } catch (err) {
       console.error('Error guardando audio:', err)
@@ -70,6 +71,7 @@ export function AudioPlayer() {
     if (!current) return
     stopBackingTrack()
     await deleteAudio(current.id)
+    await loadBackingTrack(null)
     updateScore(current.id, { hasAudio: false })
   }
 

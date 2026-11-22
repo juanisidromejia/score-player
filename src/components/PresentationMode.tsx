@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { OpenSheetMusicDisplay, TransposeCalculator } from 'opensheetmusicdisplay'
 import { useAppStore } from '../store'
 import { getPresentationScores } from '../lib/visibleScores'
+import { computePageLayout } from '../lib/presentationLayout'
 import {
   getBackingTrackState,
   loadBackingTrack,
@@ -114,12 +115,11 @@ export function PresentationMode({ open, onClose }: Props) {
       return
     }
 
-    const containerW = container.clientWidth || window.innerWidth
-    const containerH = container.clientHeight || window.innerHeight
+    const containerW = container.clientWidth
+    if (!containerW) return
     const baseWidth = Math.max(720, containerW) * Math.pow(1.25, zoomStep)
     const autoZoom = Math.min(1, containerW / baseWidth)
     const zoom = Math.max(0.3, Math.min(1, autoZoom * manualZoom))
-    const targetPerPage = Math.max(2, Math.min(5, Math.round(containerH / 220)))
 
     const osmd = new OpenSheetMusicDisplay(paper, {
       autoResize: false,
@@ -144,42 +144,25 @@ export function PresentationMode({ open, onClose }: Props) {
         if (!pagesRef.current || !paperRef.current) return
         if (!paper.querySelector('svg')) return
 
+        const availableH = container.clientHeight
+        if (!availableH) return
+
         const paperRect = paper.getBoundingClientRect()
-        const paperHeight = paper.scrollHeight
-        const systems = Array.from(paper.querySelectorAll('svg > g.osmd-staffline'))
-
-        const maxH = Math.max(200, containerH - 24)
-        let offsets: number[]
-        let counts: number[]
-
-        if (systems.length > 0) {
-          // Agrupar sistemas completos hasta llenar cada pantalla.
-          offsets = [0]
-          counts = []
-          let groupTop = systems[0].getBoundingClientRect().top - paperRect.top
-          let groupBottom = 0
-          let count = 0
-
-          systems.forEach((system) => {
-            const rect = system.getBoundingClientRect()
-            const top = rect.top - paperRect.top
-            const bottom = rect.bottom - paperRect.top
-
-            if (groupBottom > 0 && bottom - groupTop > maxH) {
-              counts.push(count)
-              offsets.push(top)
-              groupTop = top
-              count = 0
+        const systems = Array.from(paper.querySelectorAll('svg > g.osmd-staffline')).map(
+          (el) => {
+            const rect = el.getBoundingClientRect()
+            return {
+              top: rect.top - paperRect.top,
+              bottom: rect.bottom - paperRect.top,
             }
-            count++
-            groupBottom = bottom
-          })
-          counts.push(count)
-        } else {
-          const pageCount = Math.max(1, Math.ceil(paperHeight / maxH))
-          offsets = Array.from({ length: pageCount }, (_, i) => i * maxH)
-          counts = offsets.map(() => 1)
-        }
+          }
+        )
+        const { offsets, counts } = computePageLayout(
+          systems,
+          availableH,
+          paper.scrollHeight
+        )
+        const targetPerPage = Math.max(2, Math.min(5, Math.round(availableH / 220)))
 
         const minPerPage = Math.min(...counts)
         if (
@@ -194,14 +177,6 @@ export function PresentationMode({ open, onClose }: Props) {
             zoomStepRef.current = next
             setZoomStep(next)
           }
-          return
-        }
-
-        offsets = offsets.filter((offset, i, all) => i === 0 || offset !== all[i - 1])
-
-        if (offsets.length <= 1 || paperHeight <= maxH) {
-          setPageOffsets([0])
-          setPage(0)
           return
         }
 
@@ -247,9 +222,11 @@ export function PresentationMode({ open, onClose }: Props) {
     return () => observer.disconnect()
   }, [open, renderScore])
 
-  // Backing track compartido con el preview
+  // Backing track compartido con el preview. Si está cerrado no se toca el
+  // cargador global: AudioPlayer es el responsable de la partitura en Opciones.
   useEffect(() => {
-    loadBackingTrack(open && current?.hasAudio ? current.id : null)
+    if (!open) return
+    loadBackingTrack(current?.hasAudio ? current.id : null)
   }, [open, current?.id, current?.hasAudio])
 
   useEffect(() => {
@@ -300,10 +277,10 @@ export function PresentationMode({ open, onClose }: Props) {
     goPage(e.deltaY > 0 ? 1 : -1)
   }
 
-  // Gestos: swipe vertical cambia de hoja, horizontal de canción y el borde izquierdo abre el drawer
+  // Gestos: swipe vertical cambia de hoja, horizontal de canción y el borde derecho abre el drawer
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
-    const isEdge = e.clientX < 28 && !drawerOpen
+    const isEdge = e.clientX > window.innerWidth - 28 && !drawerOpen
     gestureRef.current = {
       x: e.clientX,
       y: e.clientY,
@@ -320,7 +297,7 @@ export function PresentationMode({ open, onClose }: Props) {
     const dx = e.clientX - gesture.x
     const dy = e.clientY - gesture.y
 
-    if (gesture.isEdgeDrawer && dx > 30) {
+    if (gesture.isEdgeDrawer && dx < -30) {
       setDrawerOpen(true)
       gestureRef.current = null
       return

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ScoreList } from './components/ScoreList'
 import { ScoreViewer } from './components/ScoreViewer'
 import { TransposeControls } from './components/TransposeControls'
@@ -9,6 +9,7 @@ import { stopPreviewAudio } from './lib/previewAudio'
 import { resetBackingRate, stopBackingTrack } from './lib/backingTrack'
 import { stopMidi } from './lib/midiPlayback'
 import { useAppStore } from './store'
+import { loadDefaultScores } from './data/defaultScores'
 import { sampleScores } from './data/sampleScores'
 import './App.css'
 
@@ -37,18 +38,33 @@ function App() {
   const setInitialized = useAppStore((s) => s.setInitialized)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const [presentation, setPresentation] = useState(false)
+  const initializingRef = useRef(false)
   const [mobileView, setMobileView] = useState<MobileView>('library')
   const [showAdd, setShowAdd] = useState(false)
   const compact = useCompactLayout()
 
   useEffect(() => {
-    if (initialized) return
+    if (initialized || initializingRef.current) return
 
-    if (scores.length === 0) {
-      setScores(sampleScores)
-      setCurrentScore(sampleScores[0].id)
+    if (scores.length > 0) {
+      setInitialized()
+      return
     }
-    setInitialized()
+
+    initializingRef.current = true
+    void loadDefaultScores()
+      .then((defaults) => {
+        setScores(defaults)
+        setCurrentScore(defaults[0].id)
+      })
+      .catch((err: unknown) => {
+        console.error('Error cargando partituras por defecto:', err)
+        setScores(sampleScores)
+        setCurrentScore(sampleScores[0].id)
+      })
+      .finally(() => {
+        setInitialized()
+      })
   }, [initialized, scores.length, setScores, setCurrentScore, setInitialized])
 
   const openPresentation = () => {
