@@ -23,11 +23,17 @@ export interface Playlist {
   createdAt: number
 }
 
+export interface PreviewNavigation {
+  origin: 'library' | 'set'
+  playlistId: string | null
+}
+
 interface AppState {
   scores: ScoreMeta[]
   playlists: Playlist[]
   currentScoreId: string | null
   currentPlaylistId: string | null
+  previewNavigation: PreviewNavigation
   transposeSemitones: number
   respectXmlSystemBreaks: boolean
   searchQuery: string
@@ -44,6 +50,7 @@ interface AppState {
     id: string | null,
     options?: { keepTranspose?: boolean }
   ) => void
+  openScore: (id: string, navigation: PreviewNavigation) => void
 
   setTranspose: (semitones: number) => void
   setRespectXmlSystemBreaks: (value: boolean) => void
@@ -68,6 +75,7 @@ export const useAppStore = create<AppState>()(
       playlists: [],
       currentScoreId: null,
       currentPlaylistId: null,
+      previewNavigation: { origin: 'library', playlistId: null },
       transposeSemitones: 0,
       respectXmlSystemBreaks: false,
       searchQuery: '',
@@ -99,6 +107,12 @@ export const useAppStore = create<AppState>()(
           currentScoreId: id,
           transposeSemitones: options?.keepTranspose ? s.transposeSemitones : 0,
         })),
+      openScore: (id, navigation) =>
+        set({
+          currentScoreId: id,
+          transposeSemitones: 0,
+          previewNavigation: navigation,
+        }),
 
       setTranspose: (semitones) => set({ transposeSemitones: semitones }),
       setRespectXmlSystemBreaks: (value) => set({ respectXmlSystemBreaks: value }),

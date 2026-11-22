@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Playlist, ScoreMeta } from '../store'
+import type { Playlist, PreviewNavigation, ScoreMeta } from '../store'
 import { useAppStore } from '../store'
 
 /** Quita acentos y pasa a minúsculas para buscar mejor */
@@ -81,6 +81,27 @@ export function getPresentationScores({
     selectedRepertoire,
     selectedTag,
   })
+}
+
+/** Lista que recorre el preview según el origen desde el que se abrió la partitura. */
+export function getPreviewNavigationScores({
+  scores,
+  playlists,
+  previewNavigation,
+}: {
+  scores: ScoreMeta[]
+  playlists: Playlist[]
+  previewNavigation: PreviewNavigation
+}): ScoreMeta[] {
+  if (previewNavigation.origin === 'set' && previewNavigation.playlistId) {
+    const playlist = playlists.find((p) => p.id === previewNavigation.playlistId)
+    if (!playlist) return []
+    return playlist.scoreIds
+      .map((id) => scores.find((s) => s.id === id))
+      .filter((s): s is ScoreMeta => Boolean(s))
+  }
+
+  return scores
 }
 
 export function useVisibleScores(): ScoreMeta[] {

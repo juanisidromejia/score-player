@@ -10,7 +10,7 @@ interface Props {
 
 export function AddScoreModal({ open, onClose }: Props) {
   const addScore = useAppStore((s) => s.addScore)
-  const setCurrentScore = useAppStore((s) => s.setCurrentScore)
+  const openScore = useAppStore((s) => s.openScore)
 
   const [mode, setMode] = useState<'musicxml' | 'pack'>('pack')
   const [importing, setImporting] = useState(false)
@@ -29,7 +29,7 @@ export function AddScoreModal({ open, onClose }: Props) {
       const pack = JSON.parse(text) as ScorePack
       const score = await importScorePack(pack, { newId: true })
       addScore(score)
-      setCurrentScore(score.id)
+      openScore(score.id, { origin: 'library', playlistId: null })
       onClose()
     } catch (err) {
       console.error(err)
@@ -60,7 +60,7 @@ export function AddScoreModal({ open, onClose }: Props) {
         musicxml: musicxml.trim(),
         hasAudio: false,
       })
-      setCurrentScore(id)
+      openScore(id, { origin: 'library', playlistId: null })
       onClose()
     } catch (err) {
       console.error(err)

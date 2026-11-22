@@ -3,10 +3,31 @@ import { ScoreList } from './components/ScoreList'
 import { ScoreViewer } from './components/ScoreViewer'
 import { TransposeControls } from './components/TransposeControls'
 import { PresentationMode } from './components/PresentationMode'
+import { AddScoreModal } from './components/AddScoreModal'
 import { UpdatePrompt } from './components/UpdatePrompt'
+import { stopPreviewAudio } from './lib/previewAudio'
+import { resetBackingRate, stopBackingTrack } from './lib/backingTrack'
+import { stopMidi } from './lib/midiPlayback'
 import { useAppStore } from './store'
 import { sampleScores } from './data/sampleScores'
 import './App.css'
+
+type MobileView = 'library' | 'preview'
+
+function useCompactLayout() {
+  const [compact, setCompact] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches
+  )
+
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 860px)')
+    const onChange = (e: MediaQueryListEvent) => setCompact(e.matches)
+    query.addEventListener('change', onChange)
+    return () => query.removeEventListener('change', onChange)
+  }, [])
+
+  return compact
+}
 
 function App() {
   const scores = useAppStore((s) => s.scores)
@@ -16,6 +37,9 @@ function App() {
   const setInitialized = useAppStore((s) => s.setInitialized)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const [presentation, setPresentation] = useState(false)
+  const [mobileView, setMobileView] = useState<MobileView>('library')
+  const [showAdd, setShowAdd] = useState(false)
+  const compact = useCompactLayout()
 
   useEffect(() => {
     if (initialized) return
@@ -27,8 +51,18 @@ function App() {
     setInitialized()
   }, [initialized, scores.length, setScores, setCurrentScore, setInitialized])
 
+  const openPresentation = () => {
+    stopPreviewAudio()
+    stopBackingTrack()
+    resetBackingRate()
+    stopMidi()
+    setPresentation(true)
+  }
+
+  const showPreview = !compact || mobileView === 'preview'
+
   return (
-    <div className="app">
+    <div className={`app app--${mobileView}`}>
       <header className="app-header">
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">
@@ -45,11 +79,21 @@ function App() {
         </div>
 
         <div className="header-actions">
-          <TransposeControls />
-          {currentScoreId && (
+          <button
+            className="header-icon-btn"
+            onClick={() => setShowAdd(true)}
+            title="Nueva partitura"
+            aria-label="Nueva partitura"
+          >
+            +
+          </button>
+          <div className="header-transpose">
+            <TransposeControls compact={compact} />
+          </div>
+          {!compact && currentScoreId && (
             <button
               className="btn-present"
-              onClick={() => setPresentation(true)}
+              onClick={openPresentation}
               title="Modo presentación / live"
             >
               ⛶ Presentar
@@ -59,16 +103,22 @@ function App() {
       </header>
 
       <main className="app-main">
-        <ScoreList />
-        <section className="viewer-area">
-          <ScoreViewer />
-        </section>
+        <ScoreList onSelectScore={() => compact && setMobileView('preview')} />
+        {showPreview && (
+          <section className="viewer-area">
+            <ScoreViewer
+              onBack={compact ? () => setMobileView('library') : undefined}
+              onPresent={openPresentation}
+            />
+          </section>
+        )}
       </main>
 
       <PresentationMode
         open={presentation}
         onClose={() => setPresentation(false)}
       />
+      <AddScoreModal open={showAdd} onClose={() => setShowAdd(false)} />
       <UpdatePrompt />
     </div>
   )

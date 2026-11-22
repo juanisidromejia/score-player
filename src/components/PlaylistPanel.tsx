@@ -1,7 +1,11 @@
 import { useState } from 'react'
 import { useAppStore } from '../store'
 
-export function PlaylistPanel() {
+interface Props {
+  onSelectScore?: () => void
+}
+
+export function PlaylistPanel({ onSelectScore }: Props) {
   const playlists = useAppStore((s) => s.playlists)
   const scores = useAppStore((s) => s.scores)
   const currentPlaylistId = useAppStore((s) => s.currentPlaylistId)
@@ -11,7 +15,7 @@ export function PlaylistPanel() {
   const setCurrentPlaylist = useAppStore((s) => s.setCurrentPlaylist)
   const addScoreToPlaylist = useAppStore((s) => s.addScoreToPlaylist)
   const removeScoreFromPlaylist = useAppStore((s) => s.removeScoreFromPlaylist)
-  const setCurrentScore = useAppStore((s) => s.setCurrentScore)
+  const openScore = useAppStore((s) => s.openScore)
 
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -89,7 +93,10 @@ export function PlaylistPanel() {
                 <li
                   key={sid}
                   className={sid === currentScoreId ? 'active' : ''}
-                  onClick={() => setCurrentScore(sid)}
+                  onClick={() => {
+                    openScore(sid, { origin: 'set', playlistId: currentPlaylist.id })
+                    onSelectScore?.()
+                  }}
                 >
                   <span>{sc.title}</span>
                   <button

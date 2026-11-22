@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react'
 import { useAppStore } from '../store'
 import { useVisibleScores } from '../lib/visibleScores'
-import { AddScoreModal } from './AddScoreModal'
 import { ManageScoresModal } from './ManageScoresModal'
 import { PlaylistPanel } from './PlaylistPanel'
 
-export function ScoreList() {
+interface Props {
+  onSelectScore?: () => void
+}
+
+export function ScoreList({ onSelectScore }: Props) {
   const currentScoreId = useAppStore((s) => s.currentScoreId)
-  const setCurrentScore = useAppStore((s) => s.setCurrentScore)
+  const openScore = useAppStore((s) => s.openScore)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const setSearchQuery = useAppStore((s) => s.setSearchQuery)
   const selectedRepertoire = useAppStore((s) => s.selectedRepertoire)
@@ -16,8 +19,8 @@ export function ScoreList() {
   const setSelectedTag = useAppStore((s) => s.setSelectedTag)
   const scores = useAppStore((s) => s.scores)
 
-  const [showAdd, setShowAdd] = useState(false)
   const [showManage, setShowManage] = useState(false)
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [tab, setTab] = useState<'scores' | 'sets'>('scores')
 
   const allTags = useMemo(() => {
@@ -32,6 +35,11 @@ export function ScoreList() {
   }, [scores])
 
   const filtered = useVisibleScores()
+
+  const select = (id: string) => {
+    openScore(id, { origin: 'library', playlistId: null })
+    onSelectScore?.()
+  }
 
   return (
     <aside className="score-list">
@@ -48,23 +56,33 @@ export function ScoreList() {
         >
           Sets
         </button>
+        <button
+          className="list-admin-toggle"
+          onClick={() => setShowManage(true)}
+          disabled={scores.length === 0}
+          title="Gestionar partituras"
+          aria-label="Gestionar partituras"
+        >
+          ⋯
+        </button>
       </div>
 
       {tab === 'sets' ? (
-        <PlaylistPanel />
+        <PlaylistPanel onSelectScore={onSelectScore} />
       ) : (
         <>
           <div className="search-box">
             <input
               type="search"
               placeholder="Buscar partitura o tag…"
+              aria-label="Buscar partitura o tag"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
 
           <div className="filter-section">
-            <div className="repertoire-filter">
+            <div className="filter-row">
               <button
                 className={!selectedRepertoire && !selectedTag ? 'active' : ''}
                 onClick={() => {
@@ -83,9 +101,18 @@ export function ScoreList() {
                   {r}
                 </button>
               ))}
+              {allTags.length > 0 && (
+                <button
+                  className={`filter-more ${showMoreFilters || selectedTag ? 'active' : ''}`}
+                  onClick={() => setShowMoreFilters((v) => !v)}
+                  aria-expanded={showMoreFilters}
+                >
+                  {selectedTag ? `#${selectedTag}` : 'Más filtros'} ▾
+                </button>
+              )}
             </div>
 
-            {allTags.length > 0 && (
+            {showMoreFilters && allTags.length > 0 && (
               <div className="tag-filter">
                 {allTags.map((t) => (
                   <button
@@ -102,30 +129,28 @@ export function ScoreList() {
             )}
           </div>
 
-          <div className="list-actions">
-            <button className="btn-primary full" onClick={() => setShowAdd(true)}>
-              + Nueva partitura
-            </button>
-            <button
-              className="btn-manage full"
-              onClick={() => setShowManage(true)}
-              disabled={scores.length === 0}
-            >
-              Gestionar partituras
-            </button>
-          </div>
-
-          <ul>
+          <ul role="listbox" aria-label="Partituras">
             {filtered.map((s) => (
               <li
                 key={s.id}
+                role="option"
+                aria-selected={s.id === currentScoreId}
+                tabIndex={0}
                 className={s.id === currentScoreId ? 'active' : ''}
-                onClick={() => setCurrentScore(s.id)}
+                onClick={() => select(s.id)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    select(s.id)
+                  }
+                }}
               >
                 <div className="score-item-main">
                   <strong>
                     {s.title}
-                    {s.hasAudio && <span className="audio-badge" title="Tiene backing track">♪</span>}
+                    {s.hasAudio && (
+                      <span className="audio-badge" title="Tiene backing track">♪</span>
+                    )}
                   </strong>
                   <span className="meta">{s.repertoire}</span>
                   {s.tags.length > 0 && (
@@ -145,7 +170,6 @@ export function ScoreList() {
         </>
       )}
 
-      <AddScoreModal open={showAdd} onClose={() => setShowAdd(false)} />
       <ManageScoresModal open={showManage} onClose={() => setShowManage(false)} />
     </aside>
   )

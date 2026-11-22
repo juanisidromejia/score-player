@@ -1,8 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
-import * as Tone from 'tone'
 import { useAppStore } from '../store'
-import { saveAudio, loadAudio, deleteAudio } from '../lib/audioStorage'
+import { saveAudio, deleteAudio } from '../lib/audioStorage'
 import { buildScorePack, downloadScorePack } from '../lib/scorepack'
+import { registerPreviewAudioStop } from '../lib/previewAudio'
+import {
+  getBackingTrackState,
+  loadBackingTrack,
+  pauseBackingTrack,
+  playBackingTrack,
+  seekBackingTrack,
+  setBackingTranspose,
+  stopBackingTrack,
+  subscribeBackingTrack,
+  type BackingTrackState,
+} from '../lib/backingTrack'
+import { AudioProgressBar } from './AudioProgressBar'
 
 export function AudioPlayer() {
   const scores = useAppStore((s) => s.scores)
@@ -11,162 +23,38 @@ export function AudioPlayer() {
   const updateScore = useAppStore((s) => s.updateScore)
 
   const current = scores.find((s) => s.id === currentScoreId)
-
-  const playerRef = useRef<Tone.Player | null>(null)
-  const pitchShiftRef = useRef<Tone.PitchShift | null>(null)
-  const objectUrlRef = useRef<string | null>(null)
-  const resumeOffsetRef = useRef(0)
-  const playStartedAtRef = useRef(0)
-  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const clearEndTimer = () => {
-    if (endTimerRef.current !== null) {
-      clearTimeout(endTimerRef.current)
-      endTimerRef.current = null
-    }
-  }
-
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [duration, setDuration] = useState(0)
-  const [loading, setLoading] = useState(false)
+  const [track, setTrack] = useState<BackingTrackState>(getBackingTrackState)
   const [exporting, setExporting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Cargar audio desde IndexedDB cuando cambia la partitura
+  useEffect(() => subscribeBackingTrack(setTrack), [])
+
   useEffect(() => {
-    let cancelled = false
+    registerPreviewAudioStop(() => stopBackingTrack())
+    return () => registerPreviewAudioStop(null)
+  }, [])
 
-    async function setup() {
-      // cleanup
-      if (playerRef.current) {
-        try { playerRef.current.stop() } catch { /* */ }
-        playerRef.current.dispose()
-        playerRef.current = null
-      }
-      if (pitchShiftRef.current) {
-        pitchShiftRef.current.dispose()
-        pitchShiftRef.current = null
-      }
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current)
-        objectUrlRef.current = null
-      }
-      clearEndTimer()
-      resumeOffsetRef.current = 0
-      setIsPlaying(false)
-      setIsLoaded(false)
-      setDuration(0)
-
-      if (!current?.hasAudio) return
-
-      setLoading(true)
-      try {
-        const blob = await loadAudio(current.id)
-        if (cancelled || !blob) {
-          setLoading(false)
-          return
-        }
-
-        const url = URL.createObjectURL(blob)
-        objectUrlRef.current = url
-
-        const pitchShift = new Tone.PitchShift({
-          pitch: transposeSemitones,
-          windowSize: 0.1,
-        }).toDestination()
-
-        const player = new Tone.Player({
-          url,
-          onload: () => {
-            if (cancelled) return
-            setIsLoaded(true)
-            setDuration(player.buffer.duration)
-            setLoading(false)
-          },
-        }).connect(pitchShift)
-
-        playerRef.current = player
-        pitchShiftRef.current = pitchShift
-      } catch (err) {
-        console.error('Error cargando audio:', err)
-        setLoading(false)
-      }
-    }
-
-    setup()
-
+  useEffect(() => {
+    loadBackingTrack(current?.hasAudio ? current.id : null)
     return () => {
-      cancelled = true
-      clearEndTimer()
-      if (playerRef.current) {
-        try { playerRef.current.stop() } catch { /* */ }
-        playerRef.current.dispose()
-        playerRef.current = null
-      }
-      if (pitchShiftRef.current) {
-        pitchShiftRef.current.dispose()
-        pitchShiftRef.current = null
-      }
-      if (objectUrlRef.current) {
-        URL.revokeObjectURL(objectUrlRef.current)
-        objectUrlRef.current = null
-      }
+      stopBackingTrack()
     }
   }, [current?.id, current?.hasAudio])
 
-  // Actualizar pitch en tiempo real
   useEffect(() => {
-    if (pitchShiftRef.current) {
-      pitchShiftRef.current.pitch = transposeSemitones
-    }
+    setBackingTranspose(transposeSemitones)
   }, [transposeSemitones])
 
-  const togglePlay = async () => {
-    if (!playerRef.current || !isLoaded) return
-    await Tone.start()
-
-    const player = playerRef.current
-    const duration = player.buffer.duration
-
-    if (isPlaying) {
-      const elapsed = (Date.now() - playStartedAtRef.current) / 1000
-      resumeOffsetRef.current = Math.min(resumeOffsetRef.current + elapsed, duration)
-      player.stop()
-      clearEndTimer()
-      setIsPlaying(false)
-    } else {
-      if (resumeOffsetRef.current >= duration - 0.01) {
-        resumeOffsetRef.current = 0
-      }
-
-      player.start(Tone.now(), resumeOffsetRef.current)
-      playStartedAtRef.current = Date.now()
-      setIsPlaying(true)
-
-      clearEndTimer()
-      const remaining = duration - resumeOffsetRef.current
-      endTimerRef.current = setTimeout(() => {
-        setIsPlaying(false)
-        resumeOffsetRef.current = 0
-        endTimerRef.current = null
-      }, remaining * 1000)
-    }
-  }
-
-  const stopPlayback = () => {
-    if (!playerRef.current || !isLoaded) return
-    try { playerRef.current.stop() } catch { /* */ }
-    clearEndTimer()
-    resumeOffsetRef.current = 0
-    setIsPlaying(false)
+  const togglePlay = () => {
+    if (track.isPlaying) pauseBackingTrack()
+    else void playBackingTrack()
   }
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !current) return
 
-    setLoading(true)
+    setTrack((prev) => ({ ...prev, loading: true }))
     try {
       await saveAudio(current.id, file)
       updateScore(current.id, { hasAudio: true })
@@ -174,13 +62,13 @@ export function AudioPlayer() {
       console.error('Error guardando audio:', err)
       alert('No se pudo guardar el audio')
     } finally {
-      setLoading(false)
       e.target.value = ''
     }
   }
 
   const clearAudio = async () => {
     if (!current) return
+    stopBackingTrack()
     await deleteAudio(current.id)
     updateScore(current.id, { hasAudio: false })
   }
@@ -222,7 +110,7 @@ export function AudioPlayer() {
             <button
               className="btn-small primary"
               onClick={() => fileInputRef.current?.click()}
-              disabled={loading}
+              disabled={track.loading}
             >
               + Cargar audio
             </button>
@@ -237,20 +125,33 @@ export function AudioPlayer() {
         />
       </div>
 
+      {current.hasAudio && track.duration > 0 && (
+        <div className="audio-progress-row">
+          <span className="audio-time">{formatTime(track.currentTime)}</span>
+          <AudioProgressBar
+            currentTime={track.currentTime}
+            duration={track.duration}
+            onSeek={seekBackingTrack}
+          />
+          <span className="audio-time">{formatTime(track.duration)}</span>
+        </div>
+      )}
+
       {current.hasAudio && (
         <div className="audio-controls">
           <button
             className="play-btn"
             onClick={togglePlay}
-            disabled={!isLoaded || loading}
-            title={isPlaying ? 'Pausar' : 'Reproducir'}
+            disabled={!track.loaded || track.loading}
+            title={track.isPlaying ? 'Pausar' : 'Reproducir'}
+            aria-label={track.isPlaying ? 'Pausar backing track' : 'Reproducir backing track'}
           >
-            {loading ? '…' : isPlaying ? '⏸' : '▶'}
+            {track.loading ? '…' : track.isPlaying ? '⏸' : '▶'}
           </button>
           <button
             className="play-btn stop"
-            onClick={stopPlayback}
-            disabled={!isLoaded || loading}
+            onClick={stopBackingTrack}
+            disabled={!track.loaded || track.loading}
             title="Detener y volver al inicio"
             aria-label="Detener y volver al inicio"
           >
@@ -259,11 +160,11 @@ export function AudioPlayer() {
 
           <div className="audio-info">
             <span className="status">
-              {loading
+              {track.loading
                 ? 'Cargando…'
-                : isPlaying
-                  ? 'Reproduciendo'
-                  : isLoaded
+                : track.isPlaying
+                  ? 'Reproduciendo backing track'
+                  : track.loaded
                     ? 'Listo (guardado)'
                     : 'Sin audio'}
             </span>
@@ -276,8 +177,8 @@ export function AudioPlayer() {
             </span>
           </div>
 
-          {duration > 0 && (
-            <span className="duration">{formatTime(duration)}</span>
+          {track.duration > 0 && (
+            <span className="duration">{formatTime(track.duration)}</span>
           )}
         </div>
       )}

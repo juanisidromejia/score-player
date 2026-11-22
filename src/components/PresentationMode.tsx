@@ -1,9 +1,24 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { OpenSheetMusicDisplay, TransposeCalculator } from 'opensheetmusicdisplay'
-import * as Tone from 'tone'
 import { useAppStore } from '../store'
-import { loadAudio } from '../lib/audioStorage'
 import { getPresentationScores } from '../lib/visibleScores'
+import {
+  getBackingTrackState,
+  loadBackingTrack,
+  pauseBackingTrack,
+  playBackingTrack,
+  resetBackingRate,
+  seekBackingTrack,
+  setBackingRate,
+  setBackingTranspose,
+  setBackingVolume,
+  stopBackingTrack,
+  subscribeBackingTrack,
+  TEMPO_STEPS,
+  type BackingTrackState,
+} from '../lib/backingTrack'
+import { AudioProgressBar } from './AudioProgressBar'
+import { TransposeControls } from './TransposeControls'
 
 interface Props {
   open: boolean
@@ -53,12 +68,6 @@ export function PresentationMode({ open, onClose }: Props) {
 
   const paperRef = useRef<HTMLDivElement>(null)
   const pagesRef = useRef<HTMLDivElement>(null)
-  const playerRef = useRef<Tone.Player | null>(null)
-  const pitchShiftRef = useRef<Tone.PitchShift | null>(null)
-  const objectUrlRef = useRef<string | null>(null)
-  const resumeOffsetRef = useRef(0)
-  const playStartedAtRef = useRef(0)
-  const endTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const osmdRef = useRef<OpenSheetMusicDisplay | null>(null)
   const renderIdRef = useRef(0)
 
@@ -77,18 +86,12 @@ export function PresentationMode({ open, onClose }: Props) {
   const [pageOffsets, setPageOffsets] = useState<number[]>([0])
   const [zoomStep, setZoomStep] = useState(0)
   const [manualZoom, setManualZoom] = useState(1)
-  const [isPlaying, setIsPlaying] = useState(false)
-  const [audioReady, setAudioReady] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [track, setTrack] = useState<BackingTrackState>(getBackingTrackState)
 
   const totalPages = Math.max(pageOffsets.length, 1)
 
-  const clearEndTimer = () => {
-    if (endTimerRef.current !== null) {
-      clearTimeout(endTimerRef.current)
-      endTimerRef.current = null
-    }
-  }
+  useEffect(() => subscribeBackingTrack(setTrack), [])
 
   // Render MusicXML score con OSMD y calcular paginación
   const renderScore = useCallback(() => {
@@ -241,74 +244,18 @@ export function PresentationMode({ open, onClose }: Props) {
     return () => observer.disconnect()
   }, [open, renderScore])
 
-  // Audio en modo presentación
+  // Backing track compartido con el preview
   useEffect(() => {
-    if (!open || !current?.hasAudio) {
-      setAudioReady(false)
-      return
-    }
-
-    let cancelled = false
-
-    async function setup() {
-      cleanupAudio()
-      try {
-        const blob = await loadAudio(current!.id)
-        if (cancelled || !blob) return
-        const url = URL.createObjectURL(blob)
-        objectUrlRef.current = url
-
-        const pitchShift = new Tone.PitchShift({
-          pitch: transposeSemitones,
-          windowSize: 0.1,
-        }).toDestination()
-
-        const player = new Tone.Player({
-          url,
-          onload: () => {
-            if (!cancelled) setAudioReady(true)
-          },
-        }).connect(pitchShift)
-
-        playerRef.current = player
-        pitchShiftRef.current = pitchShift
-      } catch (e) {
-        console.error(e)
-      }
-    }
-
-    setup()
-    return () => {
-      cancelled = true
-      cleanupAudio()
-    }
+    loadBackingTrack(open && current?.hasAudio ? current.id : null)
   }, [open, current?.id, current?.hasAudio])
 
   useEffect(() => {
-    if (pitchShiftRef.current) {
-      pitchShiftRef.current.pitch = transposeSemitones
-    }
+    setBackingTranspose(transposeSemitones)
   }, [transposeSemitones])
 
-  function cleanupAudio() {
-    clearEndTimer()
-    resumeOffsetRef.current = 0
-    if (playerRef.current) {
-      try { playerRef.current.stop() } catch { /* */ }
-      playerRef.current.dispose()
-      playerRef.current = null
-    }
-    if (pitchShiftRef.current) {
-      pitchShiftRef.current.dispose()
-      pitchShiftRef.current = null
-    }
-    if (objectUrlRef.current) {
-      URL.revokeObjectURL(objectUrlRef.current)
-      objectUrlRef.current = null
-    }
-    setIsPlaying(false)
-    setAudioReady(false)
-  }
+  useEffect(() => {
+    if (!open) stopBackingTrack()
+  }, [open])
 
   const goPage = useCallback(
     (delta: number) => {
@@ -335,45 +282,13 @@ export function PresentationMode({ open, onClose }: Props) {
     [presentationScores, currentScoreId, setCurrentScore]
   )
 
-  const togglePlay = async () => {
-    if (!playerRef.current || !audioReady) return
-    await Tone.start()
-
-    const player = playerRef.current
-    const duration = player.buffer.duration
-
-    if (isPlaying) {
-      const elapsed = (Date.now() - playStartedAtRef.current) / 1000
-      resumeOffsetRef.current = Math.min(resumeOffsetRef.current + elapsed, duration)
-      player.stop()
-      clearEndTimer()
-      setIsPlaying(false)
-    } else {
-      if (resumeOffsetRef.current >= duration - 0.01) {
-        resumeOffsetRef.current = 0
-      }
-
-      player.start(Tone.now(), resumeOffsetRef.current)
-      playStartedAtRef.current = Date.now()
-      setIsPlaying(true)
-
-      clearEndTimer()
-      const remaining = duration - resumeOffsetRef.current
-      endTimerRef.current = setTimeout(() => {
-        setIsPlaying(false)
-        resumeOffsetRef.current = 0
-        endTimerRef.current = null
-      }, remaining * 1000)
-    }
+  const togglePlay = () => {
+    if (track.isPlaying) pauseBackingTrack()
+    else void playBackingTrack()
   }
 
-  const stopPlayback = () => {
-    if (!playerRef.current || !audioReady) return
-    try { playerRef.current.stop() } catch { /* */ }
-    clearEndTimer()
-    resumeOffsetRef.current = 0
-    setIsPlaying(false)
-  }
+  const stopPlayback = stopBackingTrack
+  const seek = seekBackingTrack
 
   const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     if (Math.abs(e.deltaY) < 10) return
@@ -468,7 +383,7 @@ export function PresentationMode({ open, onClose }: Props) {
         goPage(-1)
       } else if (e.key === ' ') {
         e.preventDefault()
-        if (current?.hasAudio) togglePlay()
+        if (current?.hasAudio && track.loaded) togglePlay()
         else goPage(1)
       } else if (e.key === 'h' || e.key === 'H') {
         setDrawerOpen((v) => !v)
@@ -491,8 +406,7 @@ export function PresentationMode({ open, onClose }: Props) {
     transposeSemitones,
     setTranspose,
     current?.hasAudio,
-    isPlaying,
-    audioReady,
+    track.loaded,
   ])
 
   if (!open || !current) return null
@@ -510,51 +424,34 @@ export function PresentationMode({ open, onClose }: Props) {
 
   return (
     <div className="presentation">
-      {/* Botón flotante para abrir el menú lateral */}
-      <button
-        className="presentation-menu-toggle"
-        onClick={() => setDrawerOpen(true)}
-        title="Abrir controles (H)"
-        aria-label="Abrir menú de controles"
-      >
-        ☰
-      </button>
-
-      <div className="presentation-floating">
-        {current.hasAudio && (
-          <>
-            <button
-              className="presentation-float-btn audio"
-              onClick={togglePlay}
-              disabled={!audioReady}
-              title={isPlaying ? 'Pausar audio' : 'Reproducir audio'}
-              aria-label={isPlaying ? 'Pausar audio' : 'Reproducir audio'}
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              {isPlaying ? '⏸' : '▶'}
-            </button>
-            <button
-              className="presentation-float-btn stop"
-              onClick={stopPlayback}
-              disabled={!audioReady}
-              title="Detener y volver al inicio"
-              aria-label="Detener y volver al inicio"
-              onPointerDown={(e) => e.stopPropagation()}
-            >
-              ⏹
-            </button>
-          </>
-        )}
+      <header className="presentation-topbar">
         <button
-          className="presentation-float-btn exit"
+          className="pres-top-btn exit"
           onClick={onClose}
           title="Salir de la presentación (Esc)"
           aria-label="Salir de la presentación"
-          onPointerDown={(e) => e.stopPropagation()}
         >
-          ✕
+          ‹
         </button>
-      </div>
+
+        <div className="pres-top-title">
+          <strong>{current.title}</strong>
+          <span>
+            {activePlaylist ? activePlaylist.name : 'Todas'} · {songNumber}/{songCount} · {page + 1}/{totalPages}
+          </span>
+        </div>
+
+        <TransposeControls compact />
+
+        <button
+          className="pres-top-btn"
+          onClick={() => setDrawerOpen(true)}
+          title="Abrir controles (H)"
+          aria-label="Abrir menú de controles"
+        >
+          ☰
+        </button>
+      </header>
 
       <div
         className="presentation-pages"
@@ -572,6 +469,71 @@ export function PresentationMode({ open, onClose }: Props) {
           style={{ transform: `translateY(-${pageOffsets[page] || 0}px)` }}
         />
       </div>
+
+      {current.hasAudio && (
+        <footer className="presentation-audio-bar">
+          <AudioProgressBar
+            currentTime={track.currentTime}
+            duration={track.duration}
+            onSeek={seek}
+            label="Posición del backing track"
+          />
+          <div className="presentation-audio-row">
+            <span className="audio-time">{formatTime(track.currentTime)}</span>
+            <button
+              className="audio-bar-btn"
+              onClick={togglePlay}
+              disabled={!track.loaded}
+              title={track.isPlaying ? 'Pausar backing track' : 'Reproducir backing track'}
+              aria-label={track.isPlaying ? 'Pausar backing track' : 'Reproducir backing track'}
+            >
+              {track.isPlaying ? '⏸' : '▶'}
+            </button>
+            <button
+              className="audio-bar-btn"
+              onClick={stopPlayback}
+              disabled={!track.loaded}
+              title="Detener y volver al inicio"
+              aria-label="Detener y volver al inicio"
+            >
+              ⏹
+            </button>
+            <span className="audio-time">{formatTime(track.duration)}</span>
+            <div className="tempo-control" title="Velocidad del backing track (no afecta al MIDI)">
+              <select
+                value={track.rate}
+                onChange={(e) => setBackingRate(Number(e.target.value))}
+                aria-label="Tempo del backing track"
+              >
+                {TEMPO_STEPS.map((rate) => (
+                  <option key={rate} value={rate}>
+                    {Math.round(rate * 100)}%
+                  </option>
+                ))}
+              </select>
+              <button
+                onClick={resetBackingRate}
+                disabled={track.rate === 1}
+                title="Volver al 100%"
+                aria-label="Volver al tempo original 100%"
+              >
+                ↺
+              </button>
+            </div>
+            <input
+              className="audio-volume"
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={track.volume}
+              onChange={(e) => setBackingVolume(Number(e.target.value))}
+              title="Volumen"
+              aria-label="Volumen"
+            />
+          </div>
+        </footer>
+      )}
 
       {/* Backdrop del drawer */}
       {drawerOpen && (
@@ -723,4 +685,10 @@ export function PresentationMode({ open, onClose }: Props) {
       </div>
     </div>
   )
+}
+
+function formatTime(sec: number) {
+  const m = Math.floor(sec / 60)
+  const s = Math.floor(sec % 60)
+  return `${m}:${s.toString().padStart(2, '0')}`
 }
