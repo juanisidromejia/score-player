@@ -38,6 +38,7 @@ function App() {
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const [presentation, setPresentation] = useState(false)
   const [mobileView, setMobileView] = useState<MobileView>('library')
+  const [mobileLibraryTab, setMobileLibraryTab] = useState<'scores' | 'sets'>('scores')
   const [showAdd, setShowAdd] = useState(false)
   const compact = useCompactLayout()
 
@@ -104,6 +105,8 @@ function App() {
 
       <main className="app-main">
         <ScoreList
+          activeTab={mobileLibraryTab}
+          onTabChange={setMobileLibraryTab}
           onSelectScore={() => compact && setMobileView('preview')}
           onPresent={openPresentation}
         />
@@ -116,6 +119,37 @@ function App() {
           </section>
         )}
       </main>
+
+      {compact && mobileView === 'library' && (
+        <nav className="mobile-screen-nav" aria-label="Navegación principal">
+          <button
+            type="button"
+            className={mobileLibraryTab === 'scores' ? 'active' : ''}
+            aria-current={mobileLibraryTab === 'scores' ? 'page' : undefined}
+            onClick={() => setMobileLibraryTab('scores')}
+          >
+            <span className="mobile-nav-icon" aria-hidden="true">♫</span>
+            <span>Partituras</span>
+          </button>
+          <button
+            type="button"
+            className={mobileLibraryTab === 'sets' ? 'active' : ''}
+            aria-current={mobileLibraryTab === 'sets' ? 'page' : undefined}
+            onClick={() => setMobileLibraryTab('sets')}
+          >
+            <span className="mobile-nav-icon" aria-hidden="true">▤</span>
+            <span>Sets</span>
+          </button>
+          <button
+            type="button"
+            disabled={!currentScoreId}
+            onClick={() => setMobileView('preview')}
+          >
+            <span className="mobile-nav-icon" aria-hidden="true">◉</span>
+            <span>Preview</span>
+          </button>
+        </nav>
+      )}
 
       <PresentationMode
         open={presentation}
