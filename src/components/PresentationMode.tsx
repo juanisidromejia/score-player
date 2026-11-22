@@ -28,7 +28,7 @@ interface Props {
 export function PresentationMode({ open, onClose }: Props) {
   const scores = useAppStore((s) => s.scores)
   const playlists = useAppStore((s) => s.playlists)
-  const currentPlaylistId = useAppStore((s) => s.currentPlaylistId)
+  const previewNavigation = useAppStore((s) => s.previewNavigation)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const transposeSemitones = useAppStore((s) => s.transposeSemitones)
   const setTranspose = useAppStore((s) => s.setTranspose)
@@ -39,14 +39,17 @@ export function PresentationMode({ open, onClose }: Props) {
   const selectedRepertoire = useAppStore((s) => s.selectedRepertoire)
   const selectedTag = useAppStore((s) => s.selectedTag)
 
-  const activePlaylist = playlists.find((p) => p.id === currentPlaylistId)
+  const activePlaylist =
+    previewNavigation.origin === 'set'
+      ? playlists.find((p) => p.id === previewNavigation.playlistId)
+      : undefined
 
   const presentationScores = useMemo(
     () =>
       getPresentationScores({
         scores,
         playlists,
-        currentPlaylistId,
+        previewNavigation,
         searchQuery,
         selectedRepertoire,
         selectedTag,
@@ -54,7 +57,7 @@ export function PresentationMode({ open, onClose }: Props) {
     [
       scores,
       playlists,
-      currentPlaylistId,
+      previewNavigation,
       searchQuery,
       selectedRepertoire,
       selectedTag,

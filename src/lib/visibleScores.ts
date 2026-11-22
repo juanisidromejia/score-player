@@ -23,7 +23,7 @@ interface VisibleScoresParams extends LibraryFilters {
 interface PresentationScoresParams extends LibraryFilters {
   scores: ScoreMeta[]
   playlists: Playlist[]
-  currentPlaylistId: string | null
+  previewNavigation: PreviewNavigation
 }
 
 /** Biblioteca general: todas las partituras que cumplen sus propios filtros. */
@@ -65,17 +65,17 @@ export function getPlaylistScores(
     .filter((s): s is ScoreMeta => Boolean(s))
 }
 
-/** Lista para el modo presentación. Un set siempre se reproduce completo y en su orden. */
+/** Lista para el modo presentación según el origen desde el que se abrió la partitura. */
 export function getPresentationScores({
   scores,
   playlists,
-  currentPlaylistId,
+  previewNavigation,
   searchQuery,
   selectedRepertoire,
   selectedTag,
 }: PresentationScoresParams): ScoreMeta[] {
-  if (currentPlaylistId) {
-    const playlist = playlists.find((p) => p.id === currentPlaylistId)
+  if (previewNavigation.origin === 'set' && previewNavigation.playlistId) {
+    const playlist = playlists.find((p) => p.id === previewNavigation.playlistId)
     if (playlist && playlist.scoreIds.length > 0) {
       return getPlaylistScores(scores, playlists, playlist.id)
     }
