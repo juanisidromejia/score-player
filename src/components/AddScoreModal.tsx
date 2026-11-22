@@ -7,49 +7,31 @@ interface Props {
   onClose: () => void
 }
 
+function titleFromXml(xml: string, filename: string): string {
+  const doc = new DOMParser().parseFromString(xml, 'application/xml')
+  const value = (tag: string) => doc.getElementsByTagName(tag)[0]?.textContent?.trim()
+  const title =
+    value('work-title') || value('movement-title') || value('part-name')
+  if (title) return title
+
+  return (
+    filename
+      .replace(/\.(music)?xml$/i, '')
+      .replace(/[_-]+/g, ' ')
+      .trim() || 'Sin título'
+  )
+}
+
 export function AddScoreModal({ open, onClose }: Props) {
   const addScore = useAppStore((s) => s.addScore)
   const setCurrentScore = useAppStore((s) => s.setCurrentScore)
 
-  const [title, setTitle] = useState('')
-  const [musicxml, setMusicXml] = useState('')
-  const [tags, setTags] = useState('')
-  const [repertoire, setRepertoire] = useState('')
   const [mode, setMode] = useState<'musicxml' | 'pack'>('pack')
   const [importing, setImporting] = useState(false)
   const packInputRef = useRef<HTMLInputElement>(null)
+  const xmlInputRef = useRef<HTMLInputElement>(null)
 
   if (!open) return null
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!musicxml.trim()) return
-
-    let finalTitle = title.trim()
-    if (!finalTitle) {
-      const match = musicxml.match(/<part-name>([^<]+)<\/part-name>/)
-      finalTitle = match ? match[1].trim() : 'Sin título'
-    }
-
-    const id = `score-${Date.now()}`
-    const tagList = tags
-      .split(/[,;]/)
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-
-    addScore({
-      id,
-      title: finalTitle,
-      tags: tagList,
-      repertoire: repertoire.trim() || 'general',
-      musicxml: musicxml.trim(),
-      hasAudio: false,
-    })
-
-    setCurrentScore(id)
-    reset()
-    onClose()
-  }
 
   const handleImportPack = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -62,7 +44,6 @@ export function AddScoreModal({ open, onClose }: Props) {
       const score = await importScorePack(pack, { newId: true })
       addScore(score)
       setCurrentScore(score.id)
-      reset()
       onClose()
     } catch (err) {
       console.error(err)
@@ -73,12 +54,35 @@ export function AddScoreModal({ open, onClose }: Props) {
     }
   }
 
-  const reset = () => {
-    setTitle('')
-    setMusicXml('')
-    setTags('')
-    setRepertoire('')
-    setMode('pack')
+  const handleImportXml = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setImporting(true)
+    try {
+      const musicxml = await file.text()
+      if (!/<score-(partwise|timewise)[\s>]/i.test(musicxml)) {
+        throw new Error('El archivo no contiene una partitura MusicXML')
+      }
+
+      const id = `score-${Date.now()}`
+      addScore({
+        id,
+        title: titleFromXml(musicxml, file.name),
+        tags: [],
+        repertoire: 'general',
+        musicxml: musicxml.trim(),
+        hasAudio: false,
+      })
+      setCurrentScore(id)
+      onClose()
+    } catch (err) {
+      console.error(err)
+      alert('No se pudo importar el archivo MusicXML')
+    } finally {
+      setImporting(false)
+      e.target.value = ''
+    }
   }
 
   return (
@@ -99,7 +103,7 @@ export function AddScoreModal({ open, onClose }: Props) {
             className={mode === 'musicxml' ? 'active' : ''}
             onClick={() => setMode('musicxml')}
           >
-            Pegar MusicXML
+            Importar MusicXML (.xml)
           </button>
         </div>
 
@@ -126,79 +130,35 @@ export function AddScoreModal({ open, onClose }: Props) {
             />
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
-            <label>
-              Título
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="Se toma del MusicXML si lo dejas vacío"
-              />
-            </label>
-
-            <label>
-              Repertorio / categoría
-              <input
-                value={repertoire}
-                onChange={(e) => setRepertoire(e.target.value)}
-                placeholder="ej: wedding, party, romantic…"
-              />
-            </label>
-
-            <label>
-              Tags (separados por coma)
-              <input
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="romántica, clásico, pop…"
-              />
-            </label>
-
-            <label>
-              Código MusicXML *
-              <textarea
-                value={musicxml}
-                onChange={(e) => setMusicXml(e.target.value)}
-                rows={12}
-                placeholder={`<?xml version="1.0" encoding="UTF-8"?>
-<score-partwise version="3.1">
-  <part-list>
-    <score-part id="P1"><part-name>Mi canción</part-name></score-part>
-  </part-list>
-  <part id="P1">
-    <measure number="1">
-      <attributes>
-        <divisions>1</divisions>
-        <key><fifths>0</fifths></key>
-        <time><beats>4</beats><beat-type>4</beat-type></time>
-        <clef><sign>G</sign><line>2</line></clef>
-      </attributes>
-      <note><pitch><step>C</step><octave>4</octave></pitch><duration>4</duration><type>whole</type></note>
-    </measure>
-  </part>
-</score-partwise>`}
-                required
-              />
-            </label>
-
-            <div className="modal-actions">
-              <button type="button" className="btn-secondary" onClick={onClose}>
-                Cancelar
-              </button>
-              <button type="submit" className="btn-primary">
-                Guardar
-              </button>
-            </div>
-          </form>
-        )}
-
-        {mode === 'pack' && (
-          <div className="modal-actions">
-            <button type="button" className="btn-secondary" onClick={onClose}>
-              Cancelar
+          <div className="import-pack">
+            <p>
+              Importa un archivo <strong>.xml</strong> o{' '}
+              <strong>.musicxml</strong> con la partitura. El título se toma del
+              archivo y luego puedes editarlo junto a los tags y el repertorio.
+            </p>
+            <button
+              type="button"
+              className="btn-primary full"
+              disabled={importing}
+              onClick={() => xmlInputRef.current?.click()}
+            >
+              {importing ? 'Importando…' : 'Elegir archivo .xml / .musicxml'}
             </button>
+            <input
+              ref={xmlInputRef}
+              type="file"
+              accept=".xml,.musicxml,application/vnd.recordare.musicxml+xml,text/xml"
+              hidden
+              onChange={handleImportXml}
+            />
           </div>
         )}
+
+        <div className="modal-actions">
+          <button type="button" className="btn-secondary" onClick={onClose}>
+            Cancelar
+          </button>
+        </div>
       </div>
     </div>
   )
