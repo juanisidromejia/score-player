@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { useAppStore } from '../store'
+import { getPlaylistScores } from '../lib/visibleScores'
+import { AddScoresToPlaylistModal } from './AddScoresToPlaylistModal'
 
 interface Props {
   onSelectScore?: () => void
@@ -13,14 +15,17 @@ export function PlaylistPanel({ onSelectScore }: Props) {
   const createPlaylist = useAppStore((s) => s.createPlaylist)
   const deletePlaylist = useAppStore((s) => s.deletePlaylist)
   const setCurrentPlaylist = useAppStore((s) => s.setCurrentPlaylist)
-  const addScoreToPlaylist = useAppStore((s) => s.addScoreToPlaylist)
   const removeScoreFromPlaylist = useAppStore((s) => s.removeScoreFromPlaylist)
   const openScore = useAppStore((s) => s.openScore)
 
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [showSelector, setShowSelector] = useState(false)
 
   const currentPlaylist = playlists.find((p) => p.id === currentPlaylistId)
+  const playlistScores = currentPlaylist
+    ? getPlaylistScores(scores, playlists, currentPlaylist.id)
+    : []
 
   const handleCreate = () => {
     if (!newName.trim()) return
@@ -84,49 +89,52 @@ export function PlaylistPanel({ onSelectScore }: Props) {
 
       {currentPlaylist && (
         <div className="playlist-detail">
-          <h4>{currentPlaylist.name}</h4>
+          <div className="playlist-detail-head">
+            <h4 title={currentPlaylist.name}>{currentPlaylist.name}</h4>
+            <button
+              type="button"
+              className="btn-primary full playlist-add-btn"
+              onClick={() => setShowSelector(true)}
+            >
+              + Agregar partituras
+            </button>
+          </div>
           <ul>
-            {currentPlaylist.scoreIds.map((sid) => {
-              const sc = scores.find((s) => s.id === sid)
-              if (!sc) return null
-              return (
-                <li
-                  key={sid}
-                  className={sid === currentScoreId ? 'active' : ''}
-                  onClick={() => {
-                    openScore(sid, { origin: 'set', playlistId: currentPlaylist.id })
-                    onSelectScore?.()
+            {playlistScores.map((sc) => (
+              <li
+                key={sc.id}
+                className={sc.id === currentScoreId ? 'active' : ''}
+                onClick={() => {
+                  openScore(sc.id, { origin: 'set', playlistId: currentPlaylist.id })
+                  onSelectScore?.()
+                }}
+              >
+                <span>{sc.title}</span>
+                <button
+                  className="btn-icon playlist-remove"
+                  title="Quitar del set"
+                  aria-label={`Quitar ${sc.title} del set`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeScoreFromPlaylist(currentPlaylist.id, sc.id)
                   }}
                 >
-                  <span>{sc.title}</span>
-                  <button
-                    className="btn-icon"
-                    title="Quitar del set"
-                    aria-label={`Quitar ${sc.title} del set`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      removeScoreFromPlaylist(currentPlaylist.id, sid)
-                    }}
-                  >
-                    ×
-                  </button>
-                </li>
-              )
-            })}
-            {currentPlaylist.scoreIds.length === 0 && (
-              <li className="empty">Set vacío — añade partituras desde la lista</li>
+                  ×
+                </button>
+              </li>
+            ))}
+            {playlistScores.length === 0 && (
+              <li className="empty">Este set aún no tiene partituras.</li>
             )}
           </ul>
-
-          {currentScoreId && !currentPlaylist.scoreIds.includes(currentScoreId) && (
-            <button
-              className="btn-small primary full"
-              onClick={() => addScoreToPlaylist(currentPlaylist.id, currentScoreId)}
-            >
-              + Añadir partitura actual al set
-            </button>
-          )}
         </div>
+      )}
+
+      {showSelector && currentPlaylist && (
+        <AddScoresToPlaylistModal
+          playlist={currentPlaylist}
+          onClose={() => setShowSelector(false)}
+        />
       )}
     </div>
   )

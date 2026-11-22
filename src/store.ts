@@ -65,6 +65,7 @@ interface AppState {
   deletePlaylist: (id: string) => void
   addScoreToPlaylist: (playlistId: string, scoreId: string) => void
   removeScoreFromPlaylist: (playlistId: string, scoreId: string) => void
+  setPlaylistScores: (playlistId: string, scoreIds: string[]) => void
   setCurrentPlaylist: (id: string | null) => void
 }
 
@@ -174,6 +175,14 @@ export const useAppStore = create<AppState>()(
           playlists: s.playlists.map((p) =>
             p.id === playlistId
               ? { ...p, scoreIds: p.scoreIds.filter((sid) => sid !== scoreId) }
+              : p
+          ),
+        })),
+      setPlaylistScores: (playlistId, scoreIds) =>
+        set((s) => ({
+          playlists: s.playlists.map((p) =>
+            p.id === playlistId
+              ? { ...p, scoreIds: Array.from(new Set(scoreIds)) }
               : p
           ),
         })),
