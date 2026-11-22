@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useAppStore } from '../store'
+import { useAppStore, type Playlist } from '../store'
 import { getPlaylistScores } from '../lib/visibleScores'
 import { AddScoresToPlaylistModal } from './AddScoresToPlaylistModal'
+import { ConfirmDeleteSetModal } from './ConfirmDeleteSetModal'
 
 interface Props {
   onSelectScore?: () => void
@@ -21,6 +22,8 @@ export function PlaylistPanel({ onSelectScore }: Props) {
   const [newName, setNewName] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showSelector, setShowSelector] = useState(false)
+  const [menuFor, setMenuFor] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Playlist | null>(null)
 
   const currentPlaylist = playlists.find((p) => p.id === currentPlaylistId)
   const playlistScores = currentPlaylist
@@ -33,6 +36,14 @@ export function PlaylistPanel({ onSelectScore }: Props) {
     setCurrentPlaylist(id)
     setNewName('')
     setShowCreate(false)
+    setMenuFor(null)
+  }
+
+  const confirmDelete = () => {
+    if (!deleteTarget) return
+    deletePlaylist(deleteTarget.id)
+    setDeleteTarget(null)
+    setMenuFor(null)
   }
 
   return (
@@ -62,7 +73,10 @@ export function PlaylistPanel({ onSelectScore }: Props) {
       <div className="playlist-list">
         <button
           className={`playlist-item ${!currentPlaylistId ? 'active' : ''}`}
-          onClick={() => setCurrentPlaylist(null)}
+          onClick={() => {
+            setCurrentPlaylist(null)
+            setMenuFor(null)
+          }}
         >
           Todas las partituras
         </button>
@@ -70,19 +84,36 @@ export function PlaylistPanel({ onSelectScore }: Props) {
           <div key={p.id} className="playlist-row">
             <button
               className={`playlist-item ${currentPlaylistId === p.id ? 'active' : ''}`}
-              onClick={() => setCurrentPlaylist(p.id)}
+              onClick={() => {
+                setCurrentPlaylist(p.id)
+                setMenuFor(null)
+              }}
             >
               {p.name}
               <span className="count">{p.scoreIds.length}</span>
             </button>
             <button
-              className="btn-icon danger"
-              title="Eliminar set"
-              aria-label={`Eliminar set ${p.name}`}
-              onClick={() => deletePlaylist(p.id)}
+              className="btn-icon playlist-options"
+              title={`Opciones de ${p.name}`}
+              aria-label={`Opciones del set ${p.name}`}
+              aria-expanded={menuFor === p.id}
+              onClick={() => setMenuFor(menuFor === p.id ? null : p.id)}
             >
-              ×
+              ⋯
             </button>
+            {menuFor === p.id && (
+              <div className="playlist-options-menu">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteTarget(p)
+                    setMenuFor(null)
+                  }}
+                >
+                  Eliminar Set
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -134,6 +165,14 @@ export function PlaylistPanel({ onSelectScore }: Props) {
         <AddScoresToPlaylistModal
           playlist={currentPlaylist}
           onClose={() => setShowSelector(false)}
+        />
+      )}
+
+      {deleteTarget && (
+        <ConfirmDeleteSetModal
+          playlist={deleteTarget}
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
         />
       )}
     </div>
