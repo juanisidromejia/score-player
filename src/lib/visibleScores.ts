@@ -10,36 +10,32 @@ export function normalize(text: string) {
     .replace(/[\u0300-\u036f]/g, '')
 }
 
-interface VisibleScoresParams {
-  scores: ScoreMeta[]
-  playlists: Playlist[]
-  currentPlaylistId: string | null
+interface LibraryFilters {
   searchQuery: string
   selectedRepertoire: string | null
   selectedTag: string | null
 }
 
-/** Lista que ve el usuario en la barra lateral. */
+interface VisibleScoresParams extends LibraryFilters {
+  scores: ScoreMeta[]
+}
+
+interface PresentationScoresParams extends LibraryFilters {
+  scores: ScoreMeta[]
+  playlists: Playlist[]
+  currentPlaylistId: string | null
+}
+
+/** Biblioteca general: todas las partituras que cumplen sus propios filtros. */
 export function getVisibleScores({
   scores,
-  playlists,
-  currentPlaylistId,
   searchQuery,
   selectedRepertoire,
   selectedTag,
 }: VisibleScoresParams): ScoreMeta[] {
-  let list = scores
-
-  if (currentPlaylistId) {
-    const playlist = playlists.find((p) => p.id === currentPlaylistId)
-    if (playlist) {
-      list = list.filter((s) => playlist.scoreIds.includes(s.id))
-    }
-  }
-
   const q = normalize(searchQuery)
 
-  return list.filter((s) => {
+  return scores.filter((s) => {
     const matchSearch =
       !q ||
       normalize(s.title).includes(q) ||
@@ -55,6 +51,20 @@ export function getVisibleScores({
   })
 }
 
+/** Partituras de un set en su orden guardado, resolviendo las referencias. */
+export function getPlaylistScores(
+  scores: ScoreMeta[],
+  playlists: Playlist[],
+  playlistId: string | null
+): ScoreMeta[] {
+  if (!playlistId) return []
+  const playlist = playlists.find((p) => p.id === playlistId)
+  if (!playlist) return []
+  return playlist.scoreIds
+    .map((id) => scores.find((s) => s.id === id))
+    .filter((s): s is ScoreMeta => Boolean(s))
+}
+
 /** Lista para el modo presentación. Un set siempre se reproduce completo y en su orden. */
 export function getPresentationScores({
   scores,
@@ -63,20 +73,16 @@ export function getPresentationScores({
   searchQuery,
   selectedRepertoire,
   selectedTag,
-}: VisibleScoresParams): ScoreMeta[] {
+}: PresentationScoresParams): ScoreMeta[] {
   if (currentPlaylistId) {
     const playlist = playlists.find((p) => p.id === currentPlaylistId)
     if (playlist && playlist.scoreIds.length > 0) {
-      return playlist.scoreIds
-        .map((id) => scores.find((s) => s.id === id))
-        .filter((s): s is ScoreMeta => Boolean(s))
+      return getPlaylistScores(scores, playlists, playlist.id)
     }
   }
 
   return getVisibleScores({
     scores,
-    playlists,
-    currentPlaylistId,
     searchQuery,
     selectedRepertoire,
     selectedTag,
@@ -96,9 +102,7 @@ export function getPreviewNavigationScores({
   if (previewNavigation.origin === 'set' && previewNavigation.playlistId) {
     const playlist = playlists.find((p) => p.id === previewNavigation.playlistId)
     if (!playlist) return []
-    return playlist.scoreIds
-      .map((id) => scores.find((s) => s.id === id))
-      .filter((s): s is ScoreMeta => Boolean(s))
+    return getPlaylistScores(scores, playlists, playlist.id)
   }
 
   return scores
@@ -106,8 +110,6 @@ export function getPreviewNavigationScores({
 
 export function useVisibleScores(): ScoreMeta[] {
   const scores = useAppStore((s) => s.scores)
-  const playlists = useAppStore((s) => s.playlists)
-  const currentPlaylistId = useAppStore((s) => s.currentPlaylistId)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const selectedRepertoire = useAppStore((s) => s.selectedRepertoire)
   const selectedTag = useAppStore((s) => s.selectedTag)
@@ -116,19 +118,10 @@ export function useVisibleScores(): ScoreMeta[] {
     () =>
       getVisibleScores({
         scores,
-        playlists,
-        currentPlaylistId,
         searchQuery,
         selectedRepertoire,
         selectedTag,
       }),
-    [
-      scores,
-      playlists,
-      currentPlaylistId,
-      searchQuery,
-      selectedRepertoire,
-      selectedTag,
-    ]
+    [scores, searchQuery, selectedRepertoire, selectedTag]
   )
 }
