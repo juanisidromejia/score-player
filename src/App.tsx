@@ -103,7 +103,10 @@ function App() {
       </header>
 
       <main className="app-main">
-        <ScoreList onSelectScore={() => compact && setMobileView('preview')} />
+        <ScoreList
+          onSelectScore={() => compact && setMobileView('preview')}
+          onPresent={openPresentation}
+        />
         {showPreview && (
           <section className="viewer-area">
             <ScoreViewer

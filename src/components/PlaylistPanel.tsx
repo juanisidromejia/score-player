@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore, type Playlist } from '../store'
 import { getPlaylistScores } from '../lib/visibleScores'
 import { AddScoresToPlaylistModal } from './AddScoresToPlaylistModal'
@@ -6,9 +6,10 @@ import { ConfirmDeleteSetModal } from './ConfirmDeleteSetModal'
 
 interface Props {
   onSelectScore?: () => void
+  onPresent?: () => void
 }
 
-export function PlaylistPanel({ onSelectScore }: Props) {
+export function PlaylistPanel({ onSelectScore, onPresent }: Props) {
   const playlists = useAppStore((s) => s.playlists)
   const scores = useAppStore((s) => s.scores)
   const currentPlaylistId = useAppStore((s) => s.currentPlaylistId)
@@ -24,16 +25,30 @@ export function PlaylistPanel({ onSelectScore }: Props) {
   const [showSelector, setShowSelector] = useState(false)
   const [menuFor, setMenuFor] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Playlist | null>(null)
+  const [openSetId, setOpenSetId] = useState<string | null>(null)
 
-  const currentPlaylist = playlists.find((p) => p.id === currentPlaylistId)
-  const playlistScores = currentPlaylist
-    ? getPlaylistScores(scores, playlists, currentPlaylist.id)
+  const viewedSet = playlists.find((p) => p.id === openSetId)
+  const playlistScores = viewedSet
+    ? getPlaylistScores(scores, playlists, viewedSet.id)
     : []
+
+  useEffect(() => {
+    if (openSetId && !playlists.some((p) => p.id === openSetId)) {
+      setOpenSetId(null)
+    }
+  }, [openSetId, playlists])
+
+  const openSetView = (id: string) => {
+    setCurrentPlaylist(id)
+    setOpenSetId(id)
+    setMenuFor(null)
+  }
 
   const handleCreate = () => {
     if (!newName.trim()) return
     const id = createPlaylist(newName)
     setCurrentPlaylist(id)
+    setOpenSetId(id)
     setNewName('')
     setShowCreate(false)
     setMenuFor(null)
@@ -44,6 +59,96 @@ export function PlaylistPanel({ onSelectScore }: Props) {
     deletePlaylist(deleteTarget.id)
     setDeleteTarget(null)
     setMenuFor(null)
+  }
+
+  const presentSet = () => {
+    if (!viewedSet || playlistScores.length === 0) return
+    openScore(playlistScores[0].id, {
+      origin: 'set',
+      playlistId: viewedSet.id,
+    })
+    onPresent?.()
+  }
+
+  if (viewedSet) {
+    return (
+      <div className="playlist-panel">
+        <div className="playlist-detail set-view">
+          <div className="set-view-header">
+            <button
+              type="button"
+              className="btn-small set-view-back"
+              onClick={() => setOpenSetId(null)}
+            >
+              ‹ Sets
+            </button>
+            <h4 title={viewedSet.name}>{viewedSet.name}</h4>
+          </div>
+
+          <div className="set-view-actions">
+            <button
+              type="button"
+              className="btn-primary full set-present-btn"
+              disabled={playlistScores.length === 0}
+              title={
+                playlistScores.length === 0
+                  ? 'Agrega partituras antes de presentar'
+                  : undefined
+              }
+              onClick={presentSet}
+            >
+              ▶ Presentar Set
+            </button>
+            <button
+              type="button"
+              className="btn-secondary full playlist-add-btn"
+              onClick={() => setShowSelector(true)}
+            >
+              + Agregar partituras
+            </button>
+          </div>
+
+          <ul>
+            {playlistScores.map((sc) => (
+              <li
+                key={sc.id}
+                className={sc.id === currentScoreId ? 'active' : ''}
+                onClick={() => {
+                  openScore(sc.id, { origin: 'set', playlistId: viewedSet.id })
+                  onSelectScore?.()
+                }}
+              >
+                <span>{sc.title}</span>
+                <button
+                  className="btn-icon playlist-remove"
+                  title="Quitar del set"
+                  aria-label={`Quitar ${sc.title} del set`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    removeScoreFromPlaylist(viewedSet.id, sc.id)
+                  }}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+            {playlistScores.length === 0 && (
+              <li className="empty">
+                Este set aún no tiene partituras. Agrega partituras para poder
+                presentarlo.
+              </li>
+            )}
+          </ul>
+        </div>
+
+        {showSelector && (
+          <AddScoresToPlaylistModal
+            playlist={viewedSet}
+            onClose={() => setShowSelector(false)}
+          />
+        )}
+      </div>
+    )
   }
 
   return (
@@ -88,9 +193,19 @@ export function PlaylistPanel({ onSelectScore }: Props) {
                 setCurrentPlaylist(p.id)
                 setMenuFor(null)
               }}
+              onDoubleClick={() => openSetView(p.id)}
+              title="Doble clic para ver el contenido"
             >
               {p.name}
               <span className="count">{p.scoreIds.length}</span>
+            </button>
+            <button
+              className="btn-small set-open-btn"
+              title={`Abrir contenido de ${p.name}`}
+              aria-label={`Abrir contenido del set ${p.name}`}
+              onClick={() => openSetView(p.id)}
+            >
+              Abrir
             </button>
             <button
               className="btn-icon playlist-options"
@@ -117,56 +232,6 @@ export function PlaylistPanel({ onSelectScore }: Props) {
           </div>
         ))}
       </div>
-
-      {currentPlaylist && (
-        <div className="playlist-detail">
-          <div className="playlist-detail-head">
-            <h4 title={currentPlaylist.name}>{currentPlaylist.name}</h4>
-            <button
-              type="button"
-              className="btn-primary full playlist-add-btn"
-              onClick={() => setShowSelector(true)}
-            >
-              + Agregar partituras
-            </button>
-          </div>
-          <ul>
-            {playlistScores.map((sc) => (
-              <li
-                key={sc.id}
-                className={sc.id === currentScoreId ? 'active' : ''}
-                onClick={() => {
-                  openScore(sc.id, { origin: 'set', playlistId: currentPlaylist.id })
-                  onSelectScore?.()
-                }}
-              >
-                <span>{sc.title}</span>
-                <button
-                  className="btn-icon playlist-remove"
-                  title="Quitar del set"
-                  aria-label={`Quitar ${sc.title} del set`}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    removeScoreFromPlaylist(currentPlaylist.id, sc.id)
-                  }}
-                >
-                  ×
-                </button>
-              </li>
-            ))}
-            {playlistScores.length === 0 && (
-              <li className="empty">Este set aún no tiene partituras.</li>
-            )}
-          </ul>
-        </div>
-      )}
-
-      {showSelector && currentPlaylist && (
-        <AddScoresToPlaylistModal
-          playlist={currentPlaylist}
-          onClose={() => setShowSelector(false)}
-        />
-      )}
 
       {deleteTarget && (
         <ConfirmDeleteSetModal

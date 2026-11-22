@@ -28,12 +28,18 @@ export interface PreviewNavigation {
   playlistId: string | null
 }
 
+export type LibrarySetFilter =
+  | { kind: 'all' }
+  | { kind: 'no-set' }
+  | { kind: 'set'; id: string }
+
 interface AppState {
   scores: ScoreMeta[]
   playlists: Playlist[]
   currentScoreId: string | null
   currentPlaylistId: string | null
   previewNavigation: PreviewNavigation
+  librarySetFilter: LibrarySetFilter
   transposeSemitones: number
   respectXmlSystemBreaks: boolean
   searchQuery: string
@@ -55,6 +61,7 @@ interface AppState {
   setTranspose: (semitones: number) => void
   setRespectXmlSystemBreaks: (value: boolean) => void
   setSearchQuery: (q: string) => void
+  setLibrarySetFilter: (filter: LibrarySetFilter) => void
   setSelectedRepertoire: (r: string | null) => void
   setSelectedTag: (t: string | null) => void
   addTagToScore: (scoreId: string, tag: string) => void
@@ -77,6 +84,7 @@ export const useAppStore = create<AppState>()(
       currentScoreId: null,
       currentPlaylistId: null,
       previewNavigation: { origin: 'library', playlistId: null },
+      librarySetFilter: { kind: 'all' },
       transposeSemitones: 0,
       respectXmlSystemBreaks: false,
       searchQuery: '',
@@ -118,6 +126,7 @@ export const useAppStore = create<AppState>()(
       setTranspose: (semitones) => set({ transposeSemitones: semitones }),
       setRespectXmlSystemBreaks: (value) => set({ respectXmlSystemBreaks: value }),
       setSearchQuery: (q) => set({ searchQuery: q }),
+      setLibrarySetFilter: (filter) => set({ librarySetFilter: filter }),
       setSelectedRepertoire: (r) => set({ selectedRepertoire: r, selectedTag: null }),
       setSelectedTag: (t) => set({ selectedTag: t, selectedRepertoire: null }),
 
@@ -161,6 +170,10 @@ export const useAppStore = create<AppState>()(
         set((s) => ({
           playlists: s.playlists.filter((p) => p.id !== id),
           currentPlaylistId: s.currentPlaylistId === id ? null : s.currentPlaylistId,
+          librarySetFilter:
+            s.librarySetFilter.kind === 'set' && s.librarySetFilter.id === id
+              ? { kind: 'all' }
+              : s.librarySetFilter,
         })),
       addScoreToPlaylist: (playlistId, scoreId) =>
         set((s) => ({

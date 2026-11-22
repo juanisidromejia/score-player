@@ -6,9 +6,10 @@ import { PlaylistPanel } from './PlaylistPanel'
 
 interface Props {
   onSelectScore?: () => void
+  onPresent?: () => void
 }
 
-export function ScoreList({ onSelectScore }: Props) {
+export function ScoreList({ onSelectScore, onPresent }: Props) {
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const openScore = useAppStore((s) => s.openScore)
   const searchQuery = useAppStore((s) => s.searchQuery)
@@ -18,6 +19,9 @@ export function ScoreList({ onSelectScore }: Props) {
   const selectedTag = useAppStore((s) => s.selectedTag)
   const setSelectedTag = useAppStore((s) => s.setSelectedTag)
   const scores = useAppStore((s) => s.scores)
+  const playlists = useAppStore((s) => s.playlists)
+  const librarySetFilter = useAppStore((s) => s.librarySetFilter)
+  const setLibrarySetFilter = useAppStore((s) => s.setLibrarySetFilter)
 
   const [showManage, setShowManage] = useState(false)
   const [showMoreFilters, setShowMoreFilters] = useState(false)
@@ -35,6 +39,19 @@ export function ScoreList({ onSelectScore }: Props) {
   }, [scores])
 
   const filtered = useVisibleScores()
+
+  const setFilterValue =
+    librarySetFilter.kind === 'all'
+      ? 'all'
+      : librarySetFilter.kind === 'no-set'
+        ? 'none'
+        : librarySetFilter.id
+
+  const changeSetFilter = (value: string) => {
+    if (value === 'all') setLibrarySetFilter({ kind: 'all' })
+    else if (value === 'none') setLibrarySetFilter({ kind: 'no-set' })
+    else setLibrarySetFilter({ kind: 'set', id: value })
+  }
 
   const select = (id: string) => {
     openScore(id, { origin: 'library', playlistId: null })
@@ -68,7 +85,7 @@ export function ScoreList({ onSelectScore }: Props) {
       </div>
 
       {tab === 'sets' ? (
-        <PlaylistPanel onSelectScore={onSelectScore} />
+        <PlaylistPanel onSelectScore={onSelectScore} onPresent={onPresent} />
       ) : (
         <>
           <div className="search-box">
@@ -79,6 +96,23 @@ export function ScoreList({ onSelectScore }: Props) {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+          </div>
+
+          <div className="library-set-filter">
+            <label htmlFor="library-set-filter">Filtrar por Set</label>
+            <select
+              id="library-set-filter"
+              value={setFilterValue}
+              onChange={(e) => changeSetFilter(e.target.value)}
+            >
+              <option value="all">Todos los repertorios</option>
+              <option value="none">Sin Set</option>
+              {playlists.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div className="filter-section">

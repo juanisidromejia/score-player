@@ -305,6 +305,41 @@ body::before {
   box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.12);
 }
 
+.library-set-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.85rem 0.6rem;
+}
+
+.library-set-filter label {
+  flex: none;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.library-set-filter select {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--ink-deep);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.library-set-filter select:focus {
+  outline: none;
+  border-color: var(--brass-dim);
+}
+
 .filter-section {
   padding: 0 0.85rem 0.5rem;
 }
@@ -1550,22 +1585,54 @@ body::before {
   background: rgba(13, 11, 9, 0.3);
 }
 
-.playlist-detail-head {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  margin-bottom: 0.75rem;
+.set-open-btn {
+  flex: none;
+  min-width: 52px;
+  min-height: 44px;
+  border-radius: var(--radius-sm);
 }
 
-.playlist-detail-head h4 {
+.playlist-detail.set-view {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  gap: 0.75rem;
+  border-top: none;
+}
+
+.set-view-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.set-view-header h4 {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.set-view-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.set-present-btn,
 .playlist-add-btn {
   min-height: 44px;
+}
+
+.playlist-detail.set-view ul {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  overflow-y: auto;
 }
 
 .playlist-remove {
@@ -2816,6 +2883,14 @@ body::before {
   .playlist-remove {
     min-width: 44px;
     min-height: 44px;
+  }
+
+  .library-set-filter select {
+    min-height: 44px;
+  }
+
+  .set-open-btn {
+    min-width: 56px;
   }
 
   .modal.selector-modal {

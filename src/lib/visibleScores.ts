@@ -1,5 +1,10 @@
 import { useMemo } from 'react'
-import type { Playlist, PreviewNavigation, ScoreMeta } from '../store'
+import type {
+  LibrarySetFilter,
+  Playlist,
+  PreviewNavigation,
+  ScoreMeta,
+} from '../store'
 import { useAppStore } from '../store'
 
 /** Quita acentos y pasa a minúsculas para buscar mejor */
@@ -18,6 +23,8 @@ interface LibraryFilters {
 
 interface VisibleScoresParams extends LibraryFilters {
   scores: ScoreMeta[]
+  playlists: Playlist[]
+  librarySetFilter: LibrarySetFilter
 }
 
 interface PresentationScoresParams extends LibraryFilters {
@@ -29,11 +36,23 @@ interface PresentationScoresParams extends LibraryFilters {
 /** Biblioteca general: todas las partituras que cumplen sus propios filtros. */
 export function getVisibleScores({
   scores,
+  playlists,
+  librarySetFilter,
   searchQuery,
   selectedRepertoire,
   selectedTag,
 }: VisibleScoresParams): ScoreMeta[] {
   const q = normalize(searchQuery)
+  const usedIds =
+    librarySetFilter.kind === 'no-set'
+      ? new Set(playlists.flatMap((p) => p.scoreIds))
+      : null
+  const filterIds =
+    librarySetFilter.kind === 'set'
+      ? new Set(
+          playlists.find((p) => p.id === librarySetFilter.id)?.scoreIds ?? []
+        )
+      : null
 
   return scores.filter((s) => {
     const matchSearch =
@@ -47,7 +66,13 @@ export function getVisibleScores({
 
     const matchTag = !selectedTag || s.tags.includes(selectedTag)
 
-    return matchSearch && matchRepertoire && matchTag
+    const matchSet = usedIds
+      ? !usedIds.has(s.id)
+      : filterIds
+        ? filterIds.has(s.id)
+        : true
+
+    return matchSearch && matchRepertoire && matchTag && matchSet
   })
 }
 
@@ -83,6 +108,8 @@ export function getPresentationScores({
 
   return getVisibleScores({
     scores,
+    playlists,
+    librarySetFilter: { kind: 'all' },
     searchQuery,
     selectedRepertoire,
     selectedTag,
@@ -110,6 +137,8 @@ export function getPreviewNavigationScores({
 
 export function useVisibleScores(): ScoreMeta[] {
   const scores = useAppStore((s) => s.scores)
+  const playlists = useAppStore((s) => s.playlists)
+  const librarySetFilter = useAppStore((s) => s.librarySetFilter)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const selectedRepertoire = useAppStore((s) => s.selectedRepertoire)
   const selectedTag = useAppStore((s) => s.selectedTag)
@@ -118,10 +147,19 @@ export function useVisibleScores(): ScoreMeta[] {
     () =>
       getVisibleScores({
         scores,
+        playlists,
+        librarySetFilter,
         searchQuery,
         selectedRepertoire,
         selectedTag,
       }),
-    [scores, searchQuery, selectedRepertoire, selectedTag]
+    [
+      scores,
+      playlists,
+      librarySetFilter,
+      searchQuery,
+      selectedRepertoire,
+      selectedTag,
+    ]
   )
 }
