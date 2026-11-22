@@ -1,25 +1,11 @@
 import { useRef, useState } from 'react'
 import { useAppStore } from '../store'
 import { importScorePack, type ScorePack } from '../lib/scorepack'
+import { readMusicXmlFile, titleFromMusicXml } from '../lib/musicxmlImport'
 
 interface Props {
   open: boolean
   onClose: () => void
-}
-
-function titleFromXml(xml: string, filename: string): string {
-  const doc = new DOMParser().parseFromString(xml, 'application/xml')
-  const value = (tag: string) => doc.getElementsByTagName(tag)[0]?.textContent?.trim()
-  const title =
-    value('work-title') || value('movement-title') || value('part-name')
-  if (title) return title
-
-  return (
-    filename
-      .replace(/\.(music)?xml$/i, '')
-      .replace(/[_-]+/g, ' ')
-      .trim() || 'Sin título'
-  )
 }
 
 export function AddScoreModal({ open, onClose }: Props) {
@@ -60,7 +46,7 @@ export function AddScoreModal({ open, onClose }: Props) {
 
     setImporting(true)
     try {
-      const musicxml = await file.text()
+      const musicxml = await readMusicXmlFile(file)
       if (!/<score-(partwise|timewise)[\s>]/i.test(musicxml)) {
         throw new Error('El archivo no contiene una partitura MusicXML')
       }
@@ -68,7 +54,7 @@ export function AddScoreModal({ open, onClose }: Props) {
       const id = `score-${Date.now()}`
       addScore({
         id,
-        title: titleFromXml(musicxml, file.name),
+        title: titleFromMusicXml(musicxml, file.name),
         tags: [],
         repertoire: 'general',
         musicxml: musicxml.trim(),
@@ -103,7 +89,7 @@ export function AddScoreModal({ open, onClose }: Props) {
             className={mode === 'musicxml' ? 'active' : ''}
             onClick={() => setMode('musicxml')}
           >
-            Importar MusicXML (.xml)
+            Importar MusicXML (.xml, .mxl)
           </button>
         </div>
 
@@ -132,9 +118,10 @@ export function AddScoreModal({ open, onClose }: Props) {
         ) : (
           <div className="import-pack">
             <p>
-              Importa un archivo <strong>.xml</strong> o{' '}
-              <strong>.musicxml</strong> con la partitura. El título se toma del
-              archivo y luego puedes editarlo junto a los tags y el repertorio.
+              Importa un archivo <strong>.xml</strong>,{' '}
+              <strong>.musicxml</strong> o <strong>.mxl</strong> comprimido con
+              la partitura. El título se toma del archivo y luego puedes
+              editarlo junto a los tags y el repertorio.
             </p>
             <button
               type="button"
@@ -142,12 +129,12 @@ export function AddScoreModal({ open, onClose }: Props) {
               disabled={importing}
               onClick={() => xmlInputRef.current?.click()}
             >
-              {importing ? 'Importando…' : 'Elegir archivo .xml / .musicxml'}
+              {importing ? 'Importando…' : 'Elegir archivo .xml / .musicxml / .mxl'}
             </button>
             <input
               ref={xmlInputRef}
               type="file"
-              accept=".xml,.musicxml,application/vnd.recordare.musicxml+xml,text/xml"
+              accept=".xml,.musicxml,.mxl,application/vnd.recordare.musicxml+xml,application/vnd.recordare.musicxml,application/zip,text/xml"
               hidden
               onChange={handleImportXml}
             />

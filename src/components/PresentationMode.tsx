@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay'
+import { OpenSheetMusicDisplay, TransposeCalculator } from 'opensheetmusicdisplay'
 import * as Tone from 'tone'
 import { useAppStore } from '../store'
 import { loadAudio } from '../lib/audioStorage'
@@ -17,6 +17,8 @@ export function PresentationMode({ open, onClose }: Props) {
   const currentScoreId = useAppStore((s) => s.currentScoreId)
   const transposeSemitones = useAppStore((s) => s.transposeSemitones)
   const setTranspose = useAppStore((s) => s.setTranspose)
+  const respectXmlSystemBreaks = useAppStore((s) => s.respectXmlSystemBreaks)
+  const setRespectXmlSystemBreaks = useAppStore((s) => s.setRespectXmlSystemBreaks)
   const setCurrentScore = useAppStore((s) => s.setCurrentScore)
   const searchQuery = useAppStore((s) => s.searchQuery)
   const selectedRepertoire = useAppStore((s) => s.selectedRepertoire)
@@ -68,10 +70,13 @@ export function PresentationMode({ open, onClose }: Props) {
     isEdgeDrawer?: boolean
   } | null>(null)
   const swipeCooldownRef = useRef(0)
-  const scrollRafRef = useRef<number | null>(null)
+  const wheelCooldownRef = useRef(0)
+  const zoomStepRef = useRef(0)
 
   const [page, setPage] = useState(0)
   const [pageOffsets, setPageOffsets] = useState<number[]>([0])
+  const [zoomStep, setZoomStep] = useState(0)
+  const [manualZoom, setManualZoom] = useState(1)
   const [isPlaying, setIsPlaying] = useState(false)
   const [audioReady, setAudioReady] = useState(false)
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -100,53 +105,54 @@ export function PresentationMode({ open, onClose }: Props) {
         '<p class="score-placeholder">Esta partitura se guardó en formato ABC antiguo. Vuelve a crearla en MusicXML o importa un .scorepack actualizado.</p>'
       setPageOffsets([0])
       setPage(0)
-      if (pagesRef.current) pagesRef.current.scrollTop = 0
       return
     }
+
+    const containerW = container.clientWidth || window.innerWidth
+    const containerH = container.clientHeight || window.innerHeight
+    const baseWidth = Math.max(720, containerW) * Math.pow(1.25, zoomStep)
+    const autoZoom = Math.min(1, containerW / baseWidth)
+    const zoom = Math.max(0.3, Math.min(1, autoZoom * manualZoom))
+    const targetPerPage = Math.max(2, Math.min(5, Math.round(containerH / 220)))
 
     const osmd = new OpenSheetMusicDisplay(paper, {
       autoResize: false,
       backend: 'svg',
+      newSystemFromXML: respectXmlSystemBreaks,
+      newPageFromXML: respectXmlSystemBreaks,
     })
+    osmd.TransposeCalculator = new TransposeCalculator()
     osmdRef.current = osmd
 
     osmd
       .load(current.musicxml)
       .then(() => {
         if (renderId !== renderIdRef.current) return
+        osmd.zoom = zoom
+        osmd.Sheet.Transpose = transposeSemitones
+        osmd.updateGraphic()
         osmd.render()
       })
       .then(() => {
         if (renderId !== renderIdRef.current) return
         if (!pagesRef.current || !paperRef.current) return
-        const containerH = pagesRef.current.clientHeight
-        const svgEls = Array.from(paper.querySelectorAll('svg'))
-        if (svgEls.length === 0) return
+        if (!paper.querySelector('svg')) return
 
         const paperRect = paper.getBoundingClientRect()
-
-        svgEls.forEach((svgEl) => {
-          svgEl.style.width = '100%'
-          svgEl.style.maxWidth = '100%'
-          svgEl.style.height = 'auto'
-          svgEl.style.display = 'block'
-          svgEl.style.margin = '0 auto'
-        })
-
         const paperHeight = paper.scrollHeight
-        const systems = Array.from(paper.querySelectorAll('svg g')).filter((g) => {
-          const cls = (g.getAttribute('class') || '').toLowerCase()
-          return cls.includes('staff') || cls.includes('system')
-        })
+        const systems = Array.from(paper.querySelectorAll('svg > g.osmd-staffline'))
 
         const maxH = Math.max(200, containerH - 24)
         let offsets: number[]
+        let counts: number[]
 
         if (systems.length > 0) {
           // Agrupar sistemas completos hasta llenar cada pantalla.
           offsets = [0]
+          counts = []
           let groupTop = systems[0].getBoundingClientRect().top - paperRect.top
           let groupBottom = 0
+          let count = 0
 
           systems.forEach((system) => {
             const rect = system.getBoundingClientRect()
@@ -154,31 +160,47 @@ export function PresentationMode({ open, onClose }: Props) {
             const bottom = rect.bottom - paperRect.top
 
             if (groupBottom > 0 && bottom - groupTop > maxH) {
+              counts.push(count)
               offsets.push(top)
               groupTop = top
+              count = 0
             }
+            count++
             groupBottom = bottom
           })
+          counts.push(count)
         } else {
           const pageCount = Math.max(1, Math.ceil(paperHeight / maxH))
           offsets = Array.from({ length: pageCount }, (_, i) => i * maxH)
+          counts = offsets.map(() => 1)
         }
 
-        if (offsets.length <= 1 && paperHeight > maxH) {
-          const pageCount = Math.ceil(paperHeight / maxH)
-          offsets = Array.from({ length: pageCount }, (_, i) => i * maxH)
+        const minPerPage = Math.min(...counts)
+        if (
+          manualZoom === 1 &&
+          zoomStep < 3 &&
+          zoom > 0.45 &&
+          systems.length >= targetPerPage * 2 &&
+          minPerPage < targetPerPage
+        ) {
+          const next = Math.min(3, zoomStep + 1)
+          if (next > zoomStepRef.current) {
+            zoomStepRef.current = next
+            setZoomStep(next)
+          }
+          return
         }
+
+        offsets = offsets.filter((offset, i, all) => i === 0 || offset !== all[i - 1])
 
         if (offsets.length <= 1 || paperHeight <= maxH) {
           setPageOffsets([0])
           setPage(0)
-          pagesRef.current.scrollTop = 0
           return
         }
 
         setPageOffsets(offsets)
         setPage(0)
-        pagesRef.current.scrollTop = 0
       })
       .catch((err: unknown) => {
         if (renderId !== renderIdRef.current) return
@@ -186,7 +208,7 @@ export function PresentationMode({ open, onClose }: Props) {
         paper.innerHTML =
           '<p style="color: var(--text); text-align: center; padding: 2rem;">Error al cargar la partitura</p>'
       })
-  }, [open, current])
+  }, [open, current, respectXmlSystemBreaks, zoomStep, manualZoom, transposeSemitones])
 
   // Si la partitura actual no está en la lista de presentación, usar la primera
   useEffect(() => {
@@ -201,6 +223,11 @@ export function PresentationMode({ open, onClose }: Props) {
     renderScore()
   }, [renderScore])
 
+  useEffect(() => {
+    zoomStepRef.current = 0
+    setZoomStep(0)
+  }, [current?.id, respectXmlSystemBreaks])
+
   // Recalcular al redimensionar
   useEffect(() => {
     if (!open) return
@@ -213,14 +240,6 @@ export function PresentationMode({ open, onClose }: Props) {
     observer.observe(container)
     return () => observer.disconnect()
   }, [open, renderScore])
-
-  useEffect(() => {
-    return () => {
-      if (scrollRafRef.current !== null) {
-        cancelAnimationFrame(scrollRafRef.current)
-      }
-    }
-  }, [])
 
   // Audio en modo presentación
   useEffect(() => {
@@ -293,14 +312,11 @@ export function PresentationMode({ open, onClose }: Props) {
 
   const goPage = useCallback(
     (delta: number) => {
-      const container = pagesRef.current
-      if (!container || pageOffsets.length === 0) return
-      const nextIndex = Math.min(Math.max(0, page + delta), pageOffsets.length - 1)
-      setPage(nextIndex)
-      const top = pageOffsets[nextIndex] || 0
-      container.scrollTo({ top })
+      setPage((current) =>
+        Math.min(Math.max(0, current + delta), Math.max(0, pageOffsets.length - 1))
+      )
     },
-    [page, pageOffsets]
+    [pageOffsets]
   )
 
   const goSong = useCallback(
@@ -351,31 +367,22 @@ export function PresentationMode({ open, onClose }: Props) {
     }
   }
 
-  // Sincronizar indicador de página con scroll manual
-  const handleScroll = useCallback(() => {
-    if (scrollRafRef.current !== null) return
+  const stopPlayback = () => {
+    if (!playerRef.current || !audioReady) return
+    try { playerRef.current.stop() } catch { /* */ }
+    clearEndTimer()
+    resumeOffsetRef.current = 0
+    setIsPlaying(false)
+  }
 
-    scrollRafRef.current = requestAnimationFrame(() => {
-      scrollRafRef.current = null
-      const container = pagesRef.current
-      if (!container || pageOffsets.length === 0) return
-      const scrollTop = container.scrollTop
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (Math.abs(e.deltaY) < 10) return
+    if (Date.now() - wheelCooldownRef.current < 250) return
+    wheelCooldownRef.current = Date.now()
+    goPage(e.deltaY > 0 ? 1 : -1)
+  }
 
-      // Buscar el offset de página más cercano
-      let closestIdx = 0
-      let minDiff = Infinity
-      for (let i = 0; i < pageOffsets.length; i++) {
-        const diff = Math.abs(scrollTop - pageOffsets[i])
-        if (diff < minDiff) {
-          minDiff = diff
-          closestIdx = i
-        }
-      }
-      setPage(closestIdx)
-    })
-  }, [pageOffsets])
-
-  // Gestos: swipe horizontal para cambiar canción y arrastre desde borde izquierdo para abrir drawer
+  // Gestos: swipe vertical cambia de hoja, horizontal de canción y el borde izquierdo abre el drawer
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return
     const isEdge = e.clientX < 28 && !drawerOpen
@@ -403,16 +410,14 @@ export function PresentationMode({ open, onClose }: Props) {
 
     if (!gesture.axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
       gesture.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
-      if (gesture.axis === 'x') {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId)
-        } catch {
-          /* */
-        }
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId)
+      } catch {
+        /* */
       }
     }
 
-    if (gesture.axis === 'x' && e.cancelable) {
+    if (gesture.axis && e.cancelable) {
       e.preventDefault()
     }
   }
@@ -421,16 +426,21 @@ export function PresentationMode({ open, onClose }: Props) {
     const gesture = gestureRef.current
     gestureRef.current = null
 
-    if (!gesture || gesture.id !== e.pointerId || gesture.axis !== 'x') return
+    if (!gesture || gesture.id !== e.pointerId || !gesture.axis) return
+    if (Date.now() - swipeCooldownRef.current < 350) return
 
     const dx = e.clientX - gesture.x
     const dy = e.clientY - gesture.y
 
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return
-    if (Date.now() - swipeCooldownRef.current < 350) return
-
-    swipeCooldownRef.current = Date.now()
-    goSong(dx < 0 ? 1 : -1)
+    if (gesture.axis === 'x') {
+      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.2) return
+      swipeCooldownRef.current = Date.now()
+      goSong(dx < 0 ? 1 : -1)
+    } else {
+      if (Math.abs(dy) < 60 || Math.abs(dy) < Math.abs(dx) * 1.2) return
+      swipeCooldownRef.current = Date.now()
+      goPage(dy < 0 ? 1 : -1)
+    }
   }
 
   const handlePointerCancel = () => {
@@ -492,6 +502,12 @@ export function PresentationMode({ open, onClose }: Props) {
       ? 'Original'
       : `${transposeSemitones > 0 ? '+' : ''}${transposeSemitones}`
 
+  const changeZoom = (delta: number) => {
+    setManualZoom((z) =>
+      Math.max(0.4, Math.min(1, Math.round((z + delta) * 10) / 10))
+    )
+  }
+
   return (
     <div className="presentation">
       {/* Botón flotante para abrir el menú lateral */}
@@ -504,10 +520,46 @@ export function PresentationMode({ open, onClose }: Props) {
         ☰
       </button>
 
+      <div className="presentation-floating">
+        {current.hasAudio && (
+          <>
+            <button
+              className="presentation-float-btn audio"
+              onClick={togglePlay}
+              disabled={!audioReady}
+              title={isPlaying ? 'Pausar audio' : 'Reproducir audio'}
+              aria-label={isPlaying ? 'Pausar audio' : 'Reproducir audio'}
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {isPlaying ? '⏸' : '▶'}
+            </button>
+            <button
+              className="presentation-float-btn stop"
+              onClick={stopPlayback}
+              disabled={!audioReady}
+              title="Detener y volver al inicio"
+              aria-label="Detener y volver al inicio"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              ⏹
+            </button>
+          </>
+        )}
+        <button
+          className="presentation-float-btn exit"
+          onClick={onClose}
+          title="Salir de la presentación (Esc)"
+          aria-label="Salir de la presentación"
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          ✕
+        </button>
+      </div>
+
       <div
         className="presentation-pages"
         ref={pagesRef}
-        onScroll={handleScroll}
+        onWheel={handleWheel}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -517,6 +569,7 @@ export function PresentationMode({ open, onClose }: Props) {
           key={current.id}
           ref={paperRef}
           className="presentation-paper"
+          style={{ transform: `translateY(-${pageOffsets[page] || 0}px)` }}
         />
       </div>
 
@@ -576,6 +629,52 @@ export function PresentationMode({ open, onClose }: Props) {
           </div>
         </div>
 
+        <div className="drawer-section">
+          <span className="drawer-label">Diseño de la partitura</span>
+          <label className="drawer-toggle">
+            <input
+              type="checkbox"
+              checked={respectXmlSystemBreaks}
+              onChange={(e) => setRespectXmlSystemBreaks(e.target.checked)}
+            />
+            <span>Respetar saltos de sistema de MuseScore</span>
+          </label>
+          <p className="drawer-hint">
+            Usa los saltos guardados en el XML. Si está desactivado, OSMD
+            calcula el layout automáticamente para la pantalla.
+          </p>
+        </div>
+
+        <div className="drawer-section">
+          <span className="drawer-label">Zoom ({Math.round(manualZoom * 100)}%)</span>
+          <div className="drawer-row">
+            <button
+              className="pres-btn"
+              onClick={() => changeZoom(-0.1)}
+              disabled={manualZoom <= 0.4}
+            >
+              − Reducir
+            </button>
+            <button
+              className="pres-btn"
+              onClick={() => setManualZoom(1)}
+              disabled={manualZoom === 1}
+            >
+              Reset
+            </button>
+            <button
+              className="pres-btn"
+              onClick={() => changeZoom(0.1)}
+              disabled={manualZoom >= 1}
+            >
+              + Ampliar
+            </button>
+          </div>
+          <p className="drawer-hint">
+            Reduce el tamaño para que la partitura quepa en menos hojas.
+          </p>
+        </div>
+
         {presentationScores.length > 1 && (
           <div className="drawer-section">
             <span className="drawer-label">Navegación de canciones</span>
@@ -621,30 +720,6 @@ export function PresentationMode({ open, onClose }: Props) {
           </div>
         </div>
 
-        {current.hasAudio && (
-          <div className="drawer-section">
-            <span className="drawer-label">Backing Track</span>
-            <button
-              className="pres-btn play-wide"
-              onClick={togglePlay}
-              disabled={!audioReady}
-            >
-              {isPlaying ? '⏸ Pausar Audio' : '▶ Reproducir Audio'}
-            </button>
-          </div>
-        )}
-
-        <div className="drawer-footer">
-          <button
-            className="pres-btn danger"
-            onClick={() => {
-              setDrawerOpen(false)
-              onClose()
-            }}
-          >
-            ✕ Salir de Presentación (Esc)
-          </button>
-        </div>
       </div>
     </div>
   )

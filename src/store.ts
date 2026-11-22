@@ -29,6 +29,7 @@ interface AppState {
   currentScoreId: string | null
   currentPlaylistId: string | null
   transposeSemitones: number
+  respectXmlSystemBreaks: boolean
   searchQuery: string
   selectedRepertoire: string | null
   selectedTag: string | null
@@ -45,6 +46,7 @@ interface AppState {
   ) => void
 
   setTranspose: (semitones: number) => void
+  setRespectXmlSystemBreaks: (value: boolean) => void
   setSearchQuery: (q: string) => void
   setSelectedRepertoire: (r: string | null) => void
   setSelectedTag: (t: string | null) => void
@@ -67,6 +69,7 @@ export const useAppStore = create<AppState>()(
       currentScoreId: null,
       currentPlaylistId: null,
       transposeSemitones: 0,
+      respectXmlSystemBreaks: false,
       searchQuery: '',
       selectedRepertoire: null,
       selectedTag: null,
@@ -98,6 +101,7 @@ export const useAppStore = create<AppState>()(
         })),
 
       setTranspose: (semitones) => set({ transposeSemitones: semitones }),
+      setRespectXmlSystemBreaks: (value) => set({ respectXmlSystemBreaks: value }),
       setSearchQuery: (q) => set({ searchQuery: q }),
       setSelectedRepertoire: (r) => set({ selectedRepertoire: r, selectedTag: null }),
       setSelectedTag: (t) => set({ selectedTag: t, selectedRepertoire: null }),
@@ -167,6 +171,7 @@ export const useAppStore = create<AppState>()(
         scores: s.scores,
         playlists: s.playlists,
         currentScoreId: s.currentScoreId,
+        respectXmlSystemBreaks: s.respectXmlSystemBreaks,
         initialized: s.initialized,
       }),
       merge: (persisted, current) => {

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { OpenSheetMusicDisplay } from 'opensheetmusicdisplay'
+import { OpenSheetMusicDisplay, TransposeCalculator } from 'opensheetmusicdisplay'
 import { useAppStore } from '../store'
 import { ScoreMetaEditor } from './ScoreMetaEditor'
 import { AudioPlayer } from './AudioPlayer'
@@ -7,10 +7,14 @@ import { AudioPlayer } from './AudioPlayer'
 export function ScoreViewer() {
   const paperRef = useRef<HTMLDivElement>(null)
   const osmdRef = useRef<OpenSheetMusicDisplay | null>(null)
+  const loadedRef = useRef(false)
+  const transposeRef = useRef(0)
 
   const scores = useAppStore((s) => s.scores)
   const currentScoreId = useAppStore((s) => s.currentScoreId)
+  const transposeSemitones = useAppStore((s) => s.transposeSemitones)
 
+  transposeRef.current = transposeSemitones
   const current = scores.find((s) => s.id === currentScoreId)
 
   useEffect(() => {
@@ -18,6 +22,8 @@ export function ScoreViewer() {
 
     const container = paperRef.current
     osmdRef.current?.dispose()
+    osmdRef.current = null
+    loadedRef.current = false
     container.innerHTML = ''
 
     if (!current.musicxml) {
@@ -30,13 +36,18 @@ export function ScoreViewer() {
       autoResize: false,
       backend: 'svg',
     })
+    osmd.TransposeCalculator = new TransposeCalculator()
     osmdRef.current = osmd
 
     let cancelled = false
     osmd
       .load(current.musicxml)
       .then(() => {
-        if (!cancelled) osmd.render()
+        if (cancelled) return
+        osmd.Sheet.Transpose = transposeRef.current
+        osmd.updateGraphic()
+        osmd.render()
+        loadedRef.current = true
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -51,6 +62,14 @@ export function ScoreViewer() {
       if (osmdRef.current === osmd) osmdRef.current = null
     }
   }, [current])
+
+  useEffect(() => {
+    const osmd = osmdRef.current
+    if (!osmd || !loadedRef.current) return
+    osmd.Sheet.Transpose = transposeSemitones
+    osmd.updateGraphic()
+    osmd.render()
+  }, [transposeSemitones])
 
   if (!current) {
     return (

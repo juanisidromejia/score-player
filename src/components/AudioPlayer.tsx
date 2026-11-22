@@ -154,6 +154,14 @@ export function AudioPlayer() {
     }
   }
 
+  const stopPlayback = () => {
+    if (!playerRef.current || !isLoaded) return
+    try { playerRef.current.stop() } catch { /* */ }
+    clearEndTimer()
+    resumeOffsetRef.current = 0
+    setIsPlaying(false)
+  }
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !current) return
@@ -238,6 +246,15 @@ export function AudioPlayer() {
             title={isPlaying ? 'Pausar' : 'Reproducir'}
           >
             {loading ? '…' : isPlaying ? '⏸' : '▶'}
+          </button>
+          <button
+            className="play-btn stop"
+            onClick={stopPlayback}
+            disabled={!isLoaded || loading}
+            title="Detener y volver al inicio"
+            aria-label="Detener y volver al inicio"
+          >
+            ⏹
           </button>
 
           <div className="audio-info">
