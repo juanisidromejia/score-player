@@ -11,6 +11,12 @@ export interface ScoreMeta {
   musicxml: string
   /** true si hay audio guardado en IndexedDB para este id */
   hasAudio?: boolean
+  /** Configuración opcional de seguimiento del backing track (tempo fijo). */
+  scoreFollowEnabled?: boolean
+  scoreFollowBpm?: number
+  scoreFollowNumerator?: number
+  scoreFollowDenominator?: number
+  scoreFollowStartOffset?: number
   originalKey?: string
   /** partitura guardada con la versión antigua de ABC, sin convertir */
   legacyAbc?: string
