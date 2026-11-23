@@ -32,6 +32,72 @@ export function ScoreMetaEditor() {
         />
       </div>
 
+      <details className="score-follow-settings">
+        <summary>Sincronización del backing track</summary>
+        <label className="score-follow-toggle">
+          <input
+            type="checkbox"
+            checked={current.scoreFollowEnabled ?? false}
+            onChange={(e) => updateScore(current.id, { scoreFollowEnabled: e.target.checked })}
+          />
+          <span>Activar seguimiento automático de la partitura</span>
+        </label>
+        {current.scoreFollowEnabled && (
+          <div className="score-follow-fields">
+            <div className="meta-row">
+              <label htmlFor="score-follow-bpm">Tempo (BPM, negra)</label>
+              <input
+                id="score-follow-bpm"
+                type="number"
+                min="20"
+                max="300"
+                step="1"
+                value={current.scoreFollowBpm ?? 120}
+                onChange={(e) => updateScore(current.id, { scoreFollowBpm: Math.max(20, Math.min(300, Number(e.target.value) || 120)) })}
+              />
+            </div>
+            <div className="score-follow-meter">
+              <div className="meta-row">
+                <label htmlFor="score-follow-numerator">Numerador</label>
+                <input
+                  id="score-follow-numerator"
+                  type="number"
+                  min="1"
+                  max="32"
+                  value={current.scoreFollowNumerator ?? 4}
+                  onChange={(e) => updateScore(current.id, { scoreFollowNumerator: Math.max(1, Math.min(32, Number(e.target.value) || 4)) })}
+                />
+              </div>
+              <div className="meta-row">
+                <label htmlFor="score-follow-denominator">Denominador</label>
+                <select
+                  id="score-follow-denominator"
+                  value={current.scoreFollowDenominator ?? 4}
+                  onChange={(e) => updateScore(current.id, { scoreFollowDenominator: Number(e.target.value) })}
+                >
+                  {[2, 4, 8, 16].map((value) => <option key={value} value={value}>{value}</option>)}
+                </select>
+              </div>
+            </div>
+            <div className="meta-row">
+              <label htmlFor="score-follow-offset">Inicio musical en el audio (segundos)</label>
+              <input
+                id="score-follow-offset"
+                type="number"
+                min="0"
+                max="3600"
+                step="0.1"
+                value={current.scoreFollowStartOffset ?? 0}
+                onChange={(e) => updateScore(current.id, { scoreFollowStartOffset: Math.max(0, Math.min(3600, Number(e.target.value) || 0)) })}
+              />
+            </div>
+            <p className="score-follow-hint">
+              Para esta versión se asume tempo constante durante toda la obra. El BPM corresponde a la negra.
+            </p>
+          </div>
+        )}
+      </details>
+
       <div className="meta-row">
         <label>Tags</label>
         <div className="tags-edit">
