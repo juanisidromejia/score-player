@@ -93,6 +93,7 @@ export function PresentationMode({ open, onClose }: Props) {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [track, setTrack] = useState<BackingTrackState>(getBackingTrackState)
   const [activeMeasure, setActiveMeasure] = useState<number | null>(null)
+  const [scoreRenderVersion, setScoreRenderVersion] = useState(0)
   const activeMeasureElementsRef = useRef<SVGElement[]>([])
 
   const totalPages = Math.max(pageOffsets.length, 1)
@@ -184,6 +185,7 @@ export function PresentationMode({ open, onClose }: Props) {
 
         setPageOffsets(offsets)
         setPage(0)
+        setScoreRenderVersion((version) => version + 1)
       })
       .catch((err: unknown) => {
         if (renderId !== renderIdRef.current) return
@@ -285,6 +287,7 @@ export function PresentationMode({ open, onClose }: Props) {
     track.loaded,
     track.currentTime,
     pageOffsets,
+    scoreRenderVersion,
     page,
   ])
 
