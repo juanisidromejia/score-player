@@ -2898,3 +2898,77 @@ body::before {
     max-height: 92dvh;
   }
 }
+
+
+/* Score Follow: resalta las notas del compás activo durante la reproducción. */
+.score-follow-active-note {
+  filter: drop-shadow(0 0 3px rgba(201, 162, 39, 0.95));
+}
+
+.score-follow-active-note path,
+.score-follow-active-note ellipse,
+.score-follow-active-note polygon {
+  fill: #b7791f !important;
+  stroke: #8a5a12 !important;
+}
+
+.score-follow-settings {
+  margin: 0.75rem 0;
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.score-follow-settings > summary {
+  cursor: pointer;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.score-follow-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+  font-size: 0.85rem;
+}
+
+.score-follow-toggle input {
+  accent-color: var(--brass);
+}
+
+.score-follow-fields {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.score-follow-meter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.score-follow-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.presentation-paper {
+  transition: transform 320ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .presentation-paper {
+    transition: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .score-follow-meter {
+    grid-template-columns: 1fr 1fr;
+  }
+}
