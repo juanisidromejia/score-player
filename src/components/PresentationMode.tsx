@@ -92,6 +92,8 @@ export function PresentationMode({ open, onClose }: Props) {
   const [manualZoom, setManualZoom] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [track, setTrack] = useState<BackingTrackState>(getBackingTrackState)
+  const [activeMeasure, setActiveMeasure] = useState<number | null>(null)
+  const activeMeasureElementsRef = useRef<SVGElement[]>([])
 
   const totalPages = Math.max(pageOffsets.length, 1)
 
@@ -190,6 +192,101 @@ export function PresentationMode({ open, onClose }: Props) {
           '<p style="color: var(--text); text-align: center; padding: 2rem;">Error al cargar la partitura</p>'
       })
   }, [open, current, respectXmlSystemBreaks, zoomStep, manualZoom, transposeSemitones])
+
+  // Seguimiento experimental: tempo fijo + compás + punto de inicio del audio.
+  // El tiempo de Tone.js se expresa en segundos de la pista original, incluso al variar playbackRate.
+  useEffect(() => {
+    activeMeasureElementsRef.current.forEach((element) =>
+      element.classList.remove('score-follow-active-note')
+    )
+    activeMeasureElementsRef.current = []
+
+    if (
+      !open ||
+      !current?.scoreFollowEnabled ||
+      !current.hasAudio ||
+      !track.loaded ||
+      !osmdRef.current ||
+      !paperRef.current
+    ) {
+      setActiveMeasure(null)
+      return
+    }
+
+    const bpm = Math.max(20, current.scoreFollowBpm ?? 120)
+    const numerator = Math.max(1, current.scoreFollowNumerator ?? 4)
+    const denominator = Math.max(1, current.scoreFollowDenominator ?? 4)
+    const startOffset = Math.max(0, current.scoreFollowStartOffset ?? 0)
+    const secondsPerMeasure = (60 / bpm) * numerator * (4 / denominator)
+    const elapsed = track.currentTime - startOffset
+
+    if (elapsed < 0 || secondsPerMeasure <= 0) {
+      setActiveMeasure(null)
+      return
+    }
+
+    const osmd = osmdRef.current as unknown as {
+      GraphicSheet?: { MeasureList?: Array<Array<{
+        staffEntries?: Array<{ graphicalVoiceEntries?: Array<{ notes?: Array<{ getSVGGElement?: () => SVGElement | undefined }> }> }>
+      }>> }
+      graphic?: { measureList?: Array<Array<{
+        staffEntries?: Array<{ graphicalVoiceEntries?: Array<{ notes?: Array<{ getSVGGElement?: () => SVGElement | undefined }> }> }>
+      }>> }
+    }
+    const measureList = osmd.GraphicSheet?.MeasureList ?? osmd.graphic?.measureList
+    if (!measureList?.length) return
+
+    const measureIndex = Math.min(
+      Math.floor(elapsed / secondsPerMeasure),
+      measureList.length - 1
+    )
+    setActiveMeasure(measureIndex + 1)
+
+    const graphicalStaves = measureList[measureIndex] ?? []
+    const noteElements: SVGElement[] = []
+    for (const graphicalMeasure of graphicalStaves) {
+      for (const staffEntry of graphicalMeasure?.staffEntries ?? []) {
+        for (const voiceEntry of staffEntry.graphicalVoiceEntries ?? []) {
+          for (const note of voiceEntry.notes ?? []) {
+            const element = note.getSVGGElement?.()
+            if (element && !noteElements.includes(element)) {
+              element.classList.add('score-follow-active-note')
+              noteElements.push(element)
+            }
+          }
+        }
+      }
+    }
+    activeMeasureElementsRef.current = noteElements
+
+    // Cambiar de página cuando el compás activo pertenece a otra página.
+    const firstNote = noteElements[0]
+    const paper = paperRef.current
+    if (firstNote && paper && pageOffsets.length > 1) {
+      const paperRect = paper.getBoundingClientRect()
+      const noteRect = firstNote.getBoundingClientRect()
+      const documentY = noteRect.top - paperRect.top + (pageOffsets[page] ?? 0)
+      let targetPage = 0
+      for (let index = 1; index < pageOffsets.length; index++) {
+        if (pageOffsets[index] <= documentY) targetPage = index
+        else break
+      }
+      if (targetPage !== page) setPage(targetPage)
+    }
+  }, [
+    open,
+    current?.id,
+    current?.scoreFollowEnabled,
+    current?.scoreFollowBpm,
+    current?.scoreFollowNumerator,
+    current?.scoreFollowDenominator,
+    current?.scoreFollowStartOffset,
+    current?.hasAudio,
+    track.loaded,
+    track.currentTime,
+    pageOffsets,
+    page,
+  ])
 
   // Si la partitura actual no está en la lista de presentación, usar la primera
   useEffect(() => {
@@ -418,6 +515,7 @@ export function PresentationMode({ open, onClose }: Props) {
           <strong>{current.title}</strong>
           <span>
             {activePlaylist ? activePlaylist.name : 'Todas'} · {songNumber}/{songCount} · {page + 1}/{totalPages}
+            {current.scoreFollowEnabled && activeMeasure !== null ? ` · Compás ${activeMeasure}` : ''}
           </span>
         </div>
 
