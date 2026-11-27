@@ -45,7 +45,7 @@ export function ScoreMetaEditor() {
         {current.scoreFollowEnabled && (
           <div className="score-follow-fields">
             <div className="meta-row">
-              <label htmlFor="score-follow-bpm">Tempo (BPM, negra)</label>
+              <label htmlFor="score-follow-bpm">Tempo manual (BPM, negra; respaldo)</label>
               <input
                 id="score-follow-bpm"
                 type="number"
@@ -92,7 +92,7 @@ export function ScoreMetaEditor() {
               />
             </div>
             <p className="score-follow-hint">
-              Para esta versión se asume tempo constante durante toda la obra. El BPM corresponde a la negra.
+              El tempo se toma automáticamente del MusicXML, incluidos sus cambios. Este valor manual se usa como respaldo si el archivo no contiene indicaciones de tempo. El BPM corresponde a la negra.
             </p>
           </div>
         )}
