@@ -201,7 +201,7 @@ export function PresentationMode({ open, onClose }: Props) {
       })
   }, [open, current, respectXmlSystemBreaks, zoomStep, manualZoom, transposeSemitones])
 
-  // Seguimiento experimental: tempo fijo + compás + punto de inicio del audio.
+  // Seguimiento por compás con tempo extraído del MusicXML y offset configurable.
   // El tiempo de Tone.js se expresa en segundos de la pista original, incluso al variar playbackRate.
   useEffect(() => {
     activeMeasureElementsRef.current.forEach((element) =>
