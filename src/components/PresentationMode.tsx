@@ -3,6 +3,7 @@ import { OpenSheetMusicDisplay, TransposeCalculator } from 'opensheetmusicdispla
 import { useAppStore } from '../store'
 import { getPresentationScores } from '../lib/visibleScores'
 import { computePageLayout } from '../lib/presentationLayout'
+import { getMusicXmlMeasureTempos } from '../lib/musicXmlTempo'
 import {
   getBackingTrackState,
   loadBackingTrack,
@@ -215,14 +216,12 @@ export function PresentationMode({ open, onClose }: Props) {
       return
     }
 
-    const bpm = Math.max(20, current.scoreFollowBpm ?? 120)
     const numerator = Math.max(1, current.scoreFollowNumerator ?? 4)
     const denominator = Math.max(1, current.scoreFollowDenominator ?? 4)
     const startOffset = Math.max(0, current.scoreFollowStartOffset ?? 0)
-    const secondsPerMeasure = (60 / bpm) * numerator * (4 / denominator)
     const elapsed = track.currentTime - startOffset
 
-    if (elapsed < 0 || secondsPerMeasure <= 0) {
+    if (elapsed < 0) {
       setActiveMeasure(null)
       return
     }
@@ -238,10 +237,25 @@ export function PresentationMode({ open, onClose }: Props) {
     const measureList = osmd.GraphicSheet?.MeasureList ?? osmd.graphic?.measureList
     if (!measureList?.length) return
 
-    const measureIndex = Math.min(
-      Math.floor(elapsed / secondsPerMeasure),
-      measureList.length - 1
+    const tempos = getMusicXmlMeasureTempos(
+      current.musicxml,
+      current.scoreFollowBpm ?? 120
     )
+    const secondsPerMeasure = (60 / Math.max(20, current.scoreFollowBpm ?? 120))
+      * numerator * (4 / denominator)
+    let remaining = elapsed
+    let measureIndex = 0
+    while (measureIndex < measureList.length - 1) {
+      const measureBpm = tempos[measureIndex] ?? current.scoreFollowBpm ?? 120
+      const measureSeconds = (60 / measureBpm) * numerator * (4 / denominator)
+      if (remaining < measureSeconds) break
+      remaining -= measureSeconds
+      measureIndex += 1
+    }
+    if (secondsPerMeasure <= 0) {
+      setActiveMeasure(null)
+      return
+    }
     setActiveMeasure(measureIndex + 1)
 
     const graphicalStaves = measureList[measureIndex] ?? []
