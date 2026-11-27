@@ -99,6 +99,11 @@ export function PresentationMode({ open, onClose }: Props) {
 
   const totalPages = Math.max(pageOffsets.length, 1)
 
+  const measureTempos = useMemo(
+    () => getMusicXmlMeasureTempos(current?.musicxml ?? '', current?.scoreFollowBpm ?? 120),
+    [current?.musicxml, current?.scoreFollowBpm]
+  )
+
   useEffect(() => subscribeBackingTrack(setTrack), [])
 
   // Render MusicXML score con OSMD y calcular paginación
@@ -237,24 +242,14 @@ export function PresentationMode({ open, onClose }: Props) {
     const measureList = osmd.GraphicSheet?.MeasureList ?? osmd.graphic?.measureList
     if (!measureList?.length) return
 
-    const tempos = getMusicXmlMeasureTempos(
-      current.musicxml,
-      current.scoreFollowBpm ?? 120
-    )
-    const secondsPerMeasure = (60 / Math.max(20, current.scoreFollowBpm ?? 120))
-      * numerator * (4 / denominator)
     let remaining = elapsed
     let measureIndex = 0
     while (measureIndex < measureList.length - 1) {
-      const measureBpm = tempos[measureIndex] ?? current.scoreFollowBpm ?? 120
+      const measureBpm = measureTempos[measureIndex] ?? current.scoreFollowBpm ?? 120
       const measureSeconds = (60 / measureBpm) * numerator * (4 / denominator)
       if (remaining < measureSeconds) break
       remaining -= measureSeconds
       measureIndex += 1
-    }
-    if (secondsPerMeasure <= 0) {
-      setActiveMeasure(null)
-      return
     }
     setActiveMeasure(measureIndex + 1)
 
@@ -294,6 +289,7 @@ export function PresentationMode({ open, onClose }: Props) {
     current?.id,
     current?.scoreFollowEnabled,
     current?.scoreFollowBpm,
+    measureTempos,
     current?.scoreFollowNumerator,
     current?.scoreFollowDenominator,
     current?.scoreFollowStartOffset,
